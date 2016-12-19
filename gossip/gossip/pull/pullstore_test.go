@@ -31,7 +31,7 @@ import (
 )
 
 var pullInterval time.Duration
-var timeoutInterval = 10 * time.Second
+var timeoutInterval = 20 * time.Second
 
 func init() {
 	pullInterval = time.Duration(500) * time.Millisecond
@@ -107,7 +107,7 @@ func createPullInstance(endpoint string, peer2PullInst map[string]*pullInstance)
 	peer2PullInst[endpoint] = inst
 
 	conf := PullConfig{
-		MsgType:           proto.MsgType_BlockMessage,
+		MsgType:           proto.PullMsgType_BlockMessage,
 		Channel:           []byte(""),
 		Id:                endpoint,
 		PeerCountToSelect: 3,
@@ -222,11 +222,17 @@ func TestHandleMessage(t *testing.T) {
 	inst1ReceivedResponse := int32(0)
 
 	inst1.mediator.RegisterMsgHook(DigestMsgType, func(itemIds []string, _ []*proto.GossipMessage, _ comm.ReceivedMessage) {
+		if atomic.LoadInt32(&inst1ReceivedDigest) == int32(1) {
+			return
+		}
 		atomic.StoreInt32(&inst1ReceivedDigest, int32(1))
 		assert.True(t, len(itemIds) == 3)
 	})
 
 	inst1.mediator.RegisterMsgHook(ResponseMsgType, func(_ []string, items []*proto.GossipMessage, _ comm.ReceivedMessage) {
+		if atomic.LoadInt32(&inst1ReceivedResponse) == int32(1) {
+			return
+		}
 		atomic.StoreInt32(&inst1ReceivedResponse, int32(1))
 		assert.True(t, len(items) == 3)
 	})
@@ -284,7 +290,7 @@ func helloMsg() *proto.GossipMessage {
 			Hello: &proto.GossipHello{
 				Nonce:    0,
 				Metadata: nil,
-				MsgType:  proto.MsgType_BlockMessage,
+				MsgType:  proto.PullMsgType_BlockMessage,
 			},
 		},
 	}
@@ -297,7 +303,7 @@ func reqMsg(digest ...string) *proto.GossipMessage {
 		Nonce:   0,
 		Content: &proto.GossipMessage_DataReq{
 			DataReq: &proto.DataRequest{
-				MsgType: proto.MsgType_BlockMessage,
+				MsgType: proto.PullMsgType_BlockMessage,
 				Nonce:   0,
 				Digests: digest,
 			},

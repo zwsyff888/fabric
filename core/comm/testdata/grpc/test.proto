@@ -14,42 +14,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package kvledger
+syntax = "proto3";
 
-import (
-	"os"
-	"testing"
-)
+message Empty {}
 
-func TestCreate(t *testing.T) {
-	lpath := "/tmp/ledgerstest"
-	os.RemoveAll(lpath)
+service TestService {
+ 
+  rpc EmptyCall(Empty) returns (Empty);
 
-	//init
-	Initialize(lpath)
-
-	defer os.RemoveAll(lpath)
-
-	func() {
-		defer func() {
-			//we expect a panic
-			if r := recover(); r == nil {
-				t.FailNow()
-			}
-		}()
-		//create once
-		if lgr := GetLedger("test"); lgr == nil {
-			t.FailNow()
-		}
-	}()
-
-	//create it
-	if lgr, _ := CreateLedger("test"); lgr == nil {
-		t.FailNow()
-	}
-
-	//get it again
-	if lgr := GetLedger("test"); lgr == nil {
-		t.FailNow()
-	}
 }
