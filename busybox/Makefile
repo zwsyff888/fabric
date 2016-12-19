@@ -1,5 +1,5 @@
 BUSYBOX_VER=1.25.1
-BUSYBOX_URL=https://www.busybox.net/downloads/busybox-$(BUSYBOX_VER).tar.bz2
+BUSYBOX_URL=http://192.168.100.119:9000/busybox-$(BUSYBOX_VER).tar.bz2
 
 OBJDIR=build/busybox-$(BUSYBOX_VER)
 

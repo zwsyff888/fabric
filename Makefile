@@ -72,7 +72,7 @@ pkgmap.block-listener := $(PKGNAME)/examples/events/block-listener
 
 include docker-env.mk
 
-all: native docker checks
+all: native docker #checks
 
 checks: linter unit-test behave
 
@@ -124,7 +124,7 @@ linter: testenv
 %/chaintool: Makefile
 	@echo "Installing chaintool"
 	@mkdir -p $(@D)
-	curl -L https://github.com/hyperledger/fabric-chaintool/releases/download/$(CHAINTOOL_RELEASE)/chaintool > $@
+	curl -L http://192.168.100.155:80/download/$(CHAINTOOL_RELEASE)/chaintool > $@
 	chmod +x $@
 
 # We (re)build a package within a docker context but persist the $GOPATH/pkg
@@ -236,3 +236,4 @@ clean: docker-clean
 .PHONY: dist-clean
 dist-clean: clean gotools-clean
 	-@rm -rf /var/hyperledger/* ||:
+

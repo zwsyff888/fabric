@@ -1,0 +1,21 @@
+[
+	{
+		"name": "fabric",
+		"host": "192.168.100.252",
+		"port": 22,
+		"type": "sftp",
+		"username": "root",
+		"password": "YunPhant888",
+		"path": "/home/zhangws/hyperleder/fabric",
+		"autosave": true,
+		"confirm": false,
+		"project": {
+			"fabric": "/Users/weisaizhang/Documents/go/src/github.com/hyperledger/fabric"
+		},
+		"ignore": [
+			"node_modules",
+			"*.class",
+			"build"
+		]
+	}
+]

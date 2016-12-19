@@ -317,7 +317,7 @@ func (s *GossipStateProviderImpl) antiEntropy() {
 
 		if current == max {
 			// No messages in the buffer or there are no gaps
-			s.logger.Debugf("Current ledger height is the same as ledger height on other peers.")
+			s.logger.Debugf("Current ledger height is the same as ledger height on other peers. Height:%d", current)
 			continue
 		}
 
@@ -366,7 +366,6 @@ func (s *GossipStateProviderImpl) requestBlocksInRange(start uint64, end uint64)
 		Content: &proto.GossipMessage_StateRequest{request},
 	}, peer)
 }
-
 
 // GetBlock return ledger block given its sequence number as a parameter
 func (s *GossipStateProviderImpl) GetBlock(index uint64) *common.Block {

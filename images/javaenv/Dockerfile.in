@@ -1,5 +1,5 @@
 FROM hyperledger/fabric-baseimage:_BASE_TAG_
-RUN wget https://services.gradle.org/distributions/gradle-2.12-bin.zip -P /tmp --quiet
+RUN wget http://192.168.100.155:80/download/gradle-2.12-bin.zip -P /tmp --quiet
 RUN unzip -q /tmp/gradle-2.12-bin.zip -d /opt && rm /tmp/gradle-2.12-bin.zip
 RUN ln -s /opt/gradle-2.12/bin/gradle /usr/bin
 ADD payload/javashim.tar.bz2 /root

@@ -143,7 +143,7 @@ peer:
         consensus:
             # Consensus plugin to use. The value is the name of the plugin, e.g. pbft, noops ( this value is case-insensitive)
             # if the given value is not recognized, we will default to noops
-            plugin: noops
+            plugin: pbft
 
             # total number of consensus messages which will be buffered per connection before delivery is rejected
             buffersize: 1000
@@ -404,7 +404,7 @@ ledger:
     # stateDatabase - options are "goleveldb", "CouchDB"
     # goleveldb - default state database stored in goleveldb.
     # CouchDB - store state database in CouchDB
-    stateDatabase: goleveldb
+    stateDatabase: CouchDB
     couchDBConfig:
        couchDBAddress: 127.0.0.1:5984
        username:
