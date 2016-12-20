@@ -396,6 +396,7 @@ func (lccc *LifeCycleSysCC) Invoke(stub shim.ChaincodeStubInterface) ([]byte, er
 	if len(args) < 1 {
 		return nil, InvalidArgsLenErr(len(args))
 	}
+	logger.Debugf("LCCC:%v", string(args[0]))
 
 	function := string(args[0])
 

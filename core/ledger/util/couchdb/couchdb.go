@@ -196,6 +196,7 @@ func (dbclient *CouchDBConnectionDef) CreateDatabaseIfNotExist() (*DBOperationRe
 		connectURL.Path = dbclient.Database
 
 		//process the URL with a PUT, creates the database
+		logger.Debugf("===COUCHDB=== Handle Request.")
 		resp, _, err := dbclient.handleRequest(http.MethodPut, connectURL.String(), nil, "", "")
 		if err != nil {
 			return nil, err
