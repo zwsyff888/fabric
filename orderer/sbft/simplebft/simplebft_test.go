@@ -33,6 +33,12 @@ func init() {
 	//logging.SetLevel(logging.DEBUG, "sbft")
 }
 
+func skipInShortMode(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping test in short mode.")
+	}
+}
+
 func connectAll(sys *testSystem) {
 	// map iteration is non-deterministic, so use linear iteration instead
 	max := uint64(0)
@@ -62,6 +68,7 @@ func connectAll(sys *testSystem) {
 }
 
 func TestSBFT(t *testing.T) {
+	skipInShortMode(t)
 	N := uint64(4)
 	sys := newTestSystem(N)
 	var repls []*SBFT
@@ -98,6 +105,7 @@ func TestSBFT(t *testing.T) {
 }
 
 func TestSBFTDelayed(t *testing.T) {
+	skipInShortMode(t)
 	N := uint64(4)
 	sys := newTestSystem(N)
 	var repls []*SBFT
@@ -139,6 +147,7 @@ func TestSBFTDelayed(t *testing.T) {
 }
 
 func TestN1(t *testing.T) {
+	skipInShortMode(t)
 	N := uint64(1)
 	sys := newTestSystem(N)
 	var repls []*SBFT
@@ -167,6 +176,7 @@ func TestN1(t *testing.T) {
 }
 
 func TestMonotonicViews(t *testing.T) {
+	skipInShortMode(t)
 	N := uint64(4)
 	sys := newTestSystem(N)
 	var repls []*SBFT
@@ -202,6 +212,7 @@ func TestMonotonicViews(t *testing.T) {
 }
 
 func TestByzPrimary(t *testing.T) {
+	skipInShortMode(t)
 	N := uint64(4)
 	sys := newTestSystem(N)
 	var repls []*SBFT
@@ -255,7 +266,57 @@ func TestByzPrimary(t *testing.T) {
 	}
 }
 
+func TestByzPrimaryBullyingSingleReplica(t *testing.T) {
+	skipInShortMode(t)
+	N := uint64(10)
+	sys := newTestSystem(N)
+	var repls []*SBFT
+	var adapters []*testSystemAdapter
+	for i := uint64(0); i < N; i++ {
+		a := sys.NewAdapter(i)
+		s, err := New(i, &Config{N: N, F: 1, BatchDurationNsec: 2000000000, BatchSizeBytes: 1, RequestTimeoutNsec: 20000000000}, a)
+		if err != nil {
+			t.Fatal(err)
+		}
+		repls = append(repls, s)
+		adapters = append(adapters, a)
+	}
+
+	r1 := []byte{1, 2, 3}
+	r2 := []byte{5, 6, 7}
+
+	// change preprepare to 1
+	sys.filterFn = func(e testElem) (testElem, bool) {
+		if msg, ok := e.ev.(*testMsgEvent); ok {
+			if pp := msg.msg.GetPreprepare(); pp != nil && msg.src == 0 && msg.dst == 1 {
+				pp := *pp
+				batch := *pp.Batch
+				batch.Payloads = [][]byte{r2}
+				pp.Batch = &batch
+				h := merkleHashData(batch.Payloads)
+				bh := &BatchHeader{}
+				proto.Unmarshal(pp.Batch.Header, bh)
+				bh.DataHash = h
+				bhraw, _ := proto.Marshal(bh)
+				pp.Batch.Header = bhraw
+				msg.msg = &Msg{&Msg_Preprepare{&pp}}
+			}
+		}
+		return e, true
+	}
+
+	connectAll(sys)
+	repls[0].Request(r1)
+	sys.Run()
+	for _, a := range adapters {
+		if a.id != 1 && len(a.batches) != 1 {
+			t.Fatal("expected execution of 1 batch at all except replica 1")
+		}
+	}
+}
+
 func TestViewChange(t *testing.T) {
+	skipInShortMode(t)
 	N := uint64(4)
 	sys := newTestSystem(N)
 	var repls []*SBFT
@@ -295,6 +356,7 @@ func TestViewChange(t *testing.T) {
 }
 
 func TestMsgReordering(t *testing.T) {
+	skipInShortMode(t)
 	N := uint64(4)
 	sys := newTestSystem(N)
 	var repls []*SBFT
@@ -347,6 +409,7 @@ func TestMsgReordering(t *testing.T) {
 }
 
 func TestBacklogReordering(t *testing.T) {
+	skipInShortMode(t)
 	N := uint64(4)
 	sys := newTestSystem(N)
 	var repls []*SBFT
@@ -399,6 +462,7 @@ func TestBacklogReordering(t *testing.T) {
 }
 
 func TestViewChangeWithRetransmission(t *testing.T) {
+	skipInShortMode(t)
 	N := uint64(4)
 	sys := newTestSystem(N)
 	var repls []*SBFT
@@ -438,6 +502,7 @@ func TestViewChangeWithRetransmission(t *testing.T) {
 }
 
 func TestViewChangeXset(t *testing.T) {
+	skipInShortMode(t)
 	N := uint64(4)
 	sys := newTestSystem(N)
 	var repls []*SBFT
@@ -514,6 +579,7 @@ func TestViewChangeXset(t *testing.T) {
 }
 
 func TestRestart(t *testing.T) {
+	skipInShortMode(t)
 	N := uint64(4)
 	sys := newTestSystem(N)
 	var repls []*SBFT
@@ -567,6 +633,7 @@ func TestRestart(t *testing.T) {
 }
 
 func TestAbdicatingPrimary(t *testing.T) {
+	skipInShortMode(t)
 	N := uint64(4)
 	sys := newTestSystem(N)
 	var repls []*SBFT
@@ -625,6 +692,7 @@ func TestAbdicatingPrimary(t *testing.T) {
 }
 
 func TestRestartAfterPrepare(t *testing.T) {
+	skipInShortMode(t)
 	N := uint64(4)
 	sys := newTestSystem(N)
 	var repls []*SBFT
@@ -694,6 +762,7 @@ func TestRestartAfterPrepare(t *testing.T) {
 }
 
 func TestRestartAfterCommit(t *testing.T) {
+	skipInShortMode(t)
 	N := uint64(4)
 	sys := newTestSystem(N)
 	var repls []*SBFT
@@ -763,6 +832,7 @@ func TestRestartAfterCommit(t *testing.T) {
 }
 
 func TestRestartAfterCheckpoint(t *testing.T) {
+	skipInShortMode(t)
 	N := uint64(4)
 	sys := newTestSystem(N)
 	var repls []*SBFT
@@ -832,6 +902,7 @@ func TestRestartAfterCheckpoint(t *testing.T) {
 }
 
 func TestErroneousViewChange(t *testing.T) {
+	skipInShortMode(t)
 	N := uint64(4)
 	sys := newTestSystem(N)
 	var repls []*SBFT
@@ -921,6 +992,7 @@ func TestErroneousViewChange(t *testing.T) {
 }
 
 func TestRestartMissedViewChange(t *testing.T) {
+	skipInShortMode(t)
 	N := uint64(4)
 	sys := newTestSystem(N)
 	var repls []*SBFT
@@ -993,6 +1065,7 @@ func TestRestartMissedViewChange(t *testing.T) {
 }
 
 func TestFullBacklog(t *testing.T) {
+	skipInShortMode(t)
 	N := uint64(4)
 	sys := newTestSystem(N)
 	var repls []*SBFT
@@ -1034,6 +1107,7 @@ func TestFullBacklog(t *testing.T) {
 }
 
 func TestHelloMsg(t *testing.T) {
+	skipInShortMode(t)
 	N := uint64(4)
 	sys := newTestSystemWOTimers(N)
 	var repls []*SBFT
@@ -1100,6 +1174,7 @@ func TestHelloMsg(t *testing.T) {
 }
 
 func TestViewChangeTimer(t *testing.T) {
+	skipInShortMode(t)
 	N := uint64(4)
 	sys := newTestSystem(N)
 	var repls []*SBFT
@@ -1183,6 +1258,7 @@ func TestViewChangeTimer(t *testing.T) {
 }
 
 func TestResendViewChange(t *testing.T) {
+	skipInShortMode(t)
 	N := uint64(4)
 	sys := newTestSystem(N)
 	var repls []*SBFT
@@ -1242,6 +1318,7 @@ func TestResendViewChange(t *testing.T) {
 }
 
 func TestTenReplicasBombedWithRequests(t *testing.T) {
+	skipInShortMode(t)
 	N := uint64(10)
 	requestNumber := 11
 	sys := newTestSystem(N)
