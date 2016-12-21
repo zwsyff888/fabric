@@ -19,6 +19,8 @@ import (
 	"testing"
 	"time"
 
+	"fmt"
+
 	"github.com/golang/protobuf/proto"
 	"github.com/hyperledger/fabric/core/chaincode/shim"
 	"github.com/hyperledger/fabric/core/container"
@@ -50,6 +52,8 @@ func initialize() {
 	// FIXME: Use peer.GetLocalAddress()
 	peerAddress := "0.0.0.0:21212"
 
+	fmt.Printf("1111111")
+
 	var opts []grpc.ServerOption
 	grpcServer := grpc.NewServer(opts...)
 
@@ -64,7 +68,7 @@ func initialize() {
 //TestDeploy tests the deploy function (stops short of actually running the chaincode)
 func TestDeploy(t *testing.T) {
 	initialize()
-
+	fmt.Printf("22222")
 	scc := new(LifeCycleSysCC)
 	stub := shim.NewMockStub("lccc", scc)
 
