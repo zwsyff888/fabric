@@ -158,7 +158,8 @@ func (c *commImpl) createConnection(endpoint string, expectedPKIID common.PKIidT
 	if c.isStopping() {
 		return nil, fmt.Errorf("Stopping")
 	}
-	cc, err = grpc.Dial(endpoint, append(c.opts, grpc.WithBlock())...)
+	//zws
+	cc, err = grpc.Dial(endpoint, append(c.opts, grpc.WithInsecure(), grpc.WithBlock())...)
 	if err != nil {
 		return nil, err
 	}
