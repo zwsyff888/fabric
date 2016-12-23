@@ -55,6 +55,7 @@ func newConfig(selfEndpoint string, bootPeers ...string) *gossip.Config {
 // NewGossipComponent creates a gossip component that attaches itself to the given gRPC server
 func NewGossipComponent(endpoint string, s *grpc.Server, dialOpts []grpc.DialOption, bootPeers ...string) gossip.Gossip {
 	conf := newConfig(endpoint, bootPeers...)
+	fmt.Printf("zws-NewGossipComponent")
 	return gossip.NewGossipService(conf, s, &naiveCryptoService{}, []byte(endpoint), dialOpts...)
 }
 

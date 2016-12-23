@@ -19,6 +19,8 @@ package service
 import (
 	"sync"
 
+	"fmt"
+
 	"github.com/hyperledger/fabric/core/committer"
 	"github.com/hyperledger/fabric/gossip/comm"
 	gossipCommon "github.com/hyperledger/fabric/gossip/common"
@@ -57,6 +59,7 @@ type gossipServiceImpl struct {
 
 // InitGossipService initialize gossip service
 func InitGossipService(endpoint string, s *grpc.Server, bootPeers ...string) {
+	fmt.Printf("zws-InitGossipService")
 	once.Do(func() {
 		gossip := integration.NewGossipComponent(endpoint, s, []grpc.DialOption{}, bootPeers...)
 		gossipServiceInstance = &gossipServiceImpl{

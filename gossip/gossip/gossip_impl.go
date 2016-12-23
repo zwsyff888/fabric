@@ -66,6 +66,7 @@ type gossipServiceImpl struct {
 
 // NewGossipService creates a gossip instance attached to a gRPC server
 func NewGossipService(conf *Config, s *grpc.Server, mcs api.MessageCryptoService, selfIdentity api.PeerIdentityType, dialOpts ...grpc.DialOption) Gossip {
+	fmt.Printf("zws-NewGossipService")
 	var c comm.Comm
 	var err error
 	idMapper := identity.NewIdentityMapper(mcs)
@@ -104,6 +105,7 @@ func NewGossipService(conf *Config, s *grpc.Server, mcs api.MessageCryptoService
 
 	g.discAdapter = g.newDiscoveryAdapter(selfIdentity)
 	g.disSecAdap = newDiscoverySecurityAdapter(idMapper, mcs, c, g.logger)
+	fmt.Printf("zws-newDiscoverySecurityAdapter")
 	g.disc = discovery.NewDiscoveryService(conf.BootstrapPeers, discovery.NetworkMember{
 		Endpoint: conf.SelfEndpoint, PKIid: g.comm.GetPKIid(), Metadata: []byte{},
 	}, g.discAdapter, g.disSecAdap)

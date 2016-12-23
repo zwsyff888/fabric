@@ -64,7 +64,7 @@ JAVASHIM_DEPS =  $(shell git ls-files core/chaincode/shim/java)
 PROTOS = $(shell git ls-files *.proto | grep -v vendor)
 MSP_SAMPLECONFIG = $(shell git ls-files msp/sampleconfig/*.pem)
 PROJECT_FILES = $(shell git ls-files)
-IMAGES = peer orderer ccenv javaenv testenv runtime
+IMAGES = peer orderer ccenv testenv runtime # javaenv
 
 pkgmap.peer           := $(PKGNAME)/peer
 pkgmap.orderer        := $(PKGNAME)/orderer
@@ -159,8 +159,8 @@ build/docker/busybox:
 		make -f busybox/Makefile install BINDIR=$(@D)
 
 # Both peer and peer-docker depend on ccenv and javaenv (all docker env images it supports).
-build/bin/peer: build/image/ccenv/$(DUMMY) build/image/javaenv/$(DUMMY)
-build/image/peer/$(DUMMY): build/image/ccenv/$(DUMMY) build/image/javaenv/$(DUMMY)
+build/bin/peer: build/image/ccenv/$(DUMMY) #build/image/javaenv/$(DUMMY)
+build/image/peer/$(DUMMY): build/image/ccenv/$(DUMMY) #build/image/javaenv/$(DUMMY)
 
 # Both peer-docker and orderer-docker depend on the runtime image
 build/image/peer/$(DUMMY): build/image/runtime/$(DUMMY)

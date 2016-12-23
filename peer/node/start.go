@@ -157,6 +157,7 @@ func serve(args []string) error {
 
 	// Initialize gossip component
 	bootstrap := viper.GetStringSlice("peer.gossip.bootstrap")
+	fmt.Printf("zws-bootstrap")
 	service.InitGossipService(peerEndpoint.Address, grpcServer, bootstrap...)
 	defer service.GetGossipService().Stop()
 

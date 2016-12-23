@@ -47,7 +47,7 @@ func init() {
 	discovery.SetReconnectInterval(aliveTimeInterval * 5)
 }
 
-var portPrefix = 5610
+var portPrefix = 3610
 var testLock = sync.RWMutex{}
 
 func acceptData(m interface{}) bool {
