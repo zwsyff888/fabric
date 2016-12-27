@@ -159,7 +159,7 @@ func (c *commImpl) createConnection(endpoint string, expectedPKIID common.PKIidT
 		return nil, fmt.Errorf("Stopping")
 	}
 	//zws
-	cc, err = grpc.Dial(endpoint, append(c.opts, grpc.WithInsecure(), grpc.WithBlock())...)
+	cc, err = grpc.Dial(endpoint, append(c.opts, grpc.WithBlock())...)
 	if err != nil {
 		return nil, err
 	}
@@ -525,7 +525,6 @@ func createGRPCLayer(port int) (*grpc.Server, net.Listener, grpc.DialOption) {
 	var err error
 	var serverOpts []grpc.ServerOption
 	var dialOpts grpc.DialOption
-
 
 	keyFileName := fmt.Sprintf("key.%d.pem", rand.Int63())
 	certFileName := fmt.Sprintf("cert.%d.pem", rand.Int63())
