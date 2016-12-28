@@ -132,6 +132,7 @@ func serve(args []string) error {
 	}
 
 	var opts []grpc.ServerOption
+	logger.Debug("peer.tls.cert.file", viper.GetString("peer.tls.cert.file"))
 	if comm.TLSEnabled() {
 		creds, err := credentials.NewServerTLSFromFile(viper.GetString("peer.tls.cert.file"),
 			viper.GetString("peer.tls.key.file"))
@@ -290,7 +291,6 @@ func createEventHubServer() (net.Listener, *grpc.Server, error) {
 		//TODO - do we need different SSL material for events ?
 		var opts []grpc.ServerOption
 		if comm.TLSEnabled() {
-			logger.Debug("peer.tls.cert.file", viper.GetString("peer.tls.cert.file"))
 			creds, err := credentials.NewServerTLSFromFile(
 				viper.GetString("peer.tls.cert.file"),
 				viper.GetString("peer.tls.key.file"))
