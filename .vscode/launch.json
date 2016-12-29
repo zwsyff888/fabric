@@ -23,7 +23,7 @@
             "port": 2345,
             "host": "127.0.0.1",
             "program": "${workspaceRoot}/peer/main",
-            "env": {"CORE_PEER_GOSSIP_BOOTSTRAP":"192.168.100.155:3212 192.168.100.156:7051"},
+            "env": {"CORE_PEER_GOSSIP_BOOTSTRAP":"192.168.100.155:6051"},
             "args": ["node","start"],
             "showLog": true
         },
