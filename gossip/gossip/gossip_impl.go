@@ -106,7 +106,6 @@ func NewGossipService(conf *Config, s *grpc.Server, mcs api.MessageCryptoService
 
 	g.discAdapter = g.newDiscoveryAdapter(selfIdentity)
 	g.disSecAdap = newDiscoverySecurityAdapter(idMapper, mcs, c, g.logger)
-	fmt.Printf("zws-newDiscoverySecurityAdapter")
 	g.disc = discovery.NewDiscoveryService(conf.BootstrapPeers, discovery.NetworkMember{
 		Endpoint: conf.SelfEndpoint, PKIid: g.comm.GetPKIid(), Metadata: []byte{},
 	}, g.discAdapter, g.disSecAdap)
@@ -542,7 +541,6 @@ func (sa *discoverySecurityAdapter) ValidateAliveMsg(am *proto.AliveMessage) boo
 		}
 	} else {
 		identity, _ = sa.idMapper.Get(am.Membership.PkiID)
-		sa.logger.Warningf("idmap:%v,pkiID:%v", sa.idMapper, am)
 		if identity != nil {
 			sa.logger.Debug("Fetched identity of", am.Membership.PkiID, "from identity store")
 		}

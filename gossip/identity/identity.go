@@ -68,7 +68,7 @@ func NewIdentityMapper(mcs api.MessageCryptoService) Mapper {
 // put associates an identity to its given pkiID, and returns an error
 // in case the given pkiID doesn't match the identity
 func (is *identityMapperImpl) Put(pkiID common.PKIidType, identity api.PeerIdentityType) error {
-	logger.Debugf("pkiID:%v,pkiID2Cert:%v", string(pkiID), string(identity))
+	//logger.Debugf("pkiID:%v,pkiID2Cert:%v", string(pkiID), string(identity))
 	if pkiID == nil {
 		return fmt.Errorf("pkiID is nil")
 	}
@@ -94,7 +94,7 @@ func (is *identityMapperImpl) Put(pkiID common.PKIidType, identity api.PeerIdent
 // get returns the identity of a given pkiID, or error if such an identity
 // isn't found
 func (is *identityMapperImpl) Get(pkiID common.PKIidType) (api.PeerIdentityType, error) {
-	logger.Debugf("pkiID:%v,pkiID2Cert:%v", string(pkiID), is.pkiID2Cert)
+	//logger.Debugf("pkiID:%v,pkiID2Cert:%v", string(pkiID), is.pkiID2Cert)
 	is.RLock()
 	defer is.RUnlock()
 	identity, exists := is.pkiID2Cert[string(pkiID)]
