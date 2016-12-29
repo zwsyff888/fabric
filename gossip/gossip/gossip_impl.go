@@ -65,9 +65,11 @@ type gossipServiceImpl struct {
 	blocksPuller pull.Mediator
 }
 
+var logger = logging.MustGetLogger("zws-gossip")
+
 // NewGossipService creates a gossip instance attached to a gRPC server
 func NewGossipService(conf *Config, s *grpc.Server, mcs api.MessageCryptoService, selfIdentity api.PeerIdentityType, dialOpts ...grpc.DialOption) Gossip {
-	var logger = logging.MustGetLogger("NewGossipService")
+
 	logger.Debugf("Config:%v", conf)
 	var c comm.Comm
 	var err error
@@ -360,6 +362,7 @@ func (g *gossipServiceImpl) GetPeers() []discovery.NetworkMember {
 	for _, member := range g.disc.GetMembership() {
 		s = append(s, member)
 	}
+	logger.Debugf("GetPeers:%v", s)
 	return s
 }
 
