@@ -88,6 +88,7 @@ func (is *identityMapperImpl) Put(pkiID common.PKIidType, identity api.PeerIdent
 	is.Lock()
 	defer is.Unlock()
 	is.pkiID2Cert[string(id)] = identity
+	logger.Infof("pkiID2Cert:%v", is.pkiID2Cert)
 	return nil
 }
 
