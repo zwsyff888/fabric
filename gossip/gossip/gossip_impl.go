@@ -542,7 +542,7 @@ func (sa *discoverySecurityAdapter) ValidateAliveMsg(am *proto.AliveMessage) boo
 		}
 	} else {
 		identity, _ = sa.idMapper.Get(am.Membership.PkiID)
-		sa.logger.Warningf("idmap:%v,pkiID:%s", sa.idMapper, am.Membership.PkiID)
+		sa.logger.Warningf("idmap:%v,pkiID:%v", sa.idMapper, am.Membership.PkiID)
 		if identity != nil {
 			sa.logger.Debug("Fetched identity of", am.Membership.PkiID, "from identity store")
 		}
