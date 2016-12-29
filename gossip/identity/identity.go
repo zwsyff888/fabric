@@ -65,6 +65,7 @@ func NewIdentityMapper(mcs api.MessageCryptoService) Mapper {
 // put associates an identity to its given pkiID, and returns an error
 // in case the given pkiID doesn't match the identity
 func (is *identityMapperImpl) Put(pkiID common.PKIidType, identity api.PeerIdentityType) error {
+	fmt.Printf("pkiID:%s,identity:%s", string(pkiID), string(identity))
 	if pkiID == nil {
 		return fmt.Errorf("pkiID is nil")
 	}
