@@ -125,7 +125,7 @@ func (vdb *VersionedDB) ApplyUpdates(batch *statedb.UpdateBatch, height *version
 	levelBatch := &leveldb.Batch{}
 	for ck, vv := range batch.KVs {
 		compositeKey := constructCompositeKey(ck.Namespace, ck.Key)
-		logger.Debugf("processing key=%#v, versionedValue=%#v", ck, vv)
+		logger.Debugf("processing key=%#v, versionedValue=%#v", ck, vv.Version.BlockNum)
 		if vv.Value == nil {
 			levelBatch.Delete(compositeKey)
 		} else {
