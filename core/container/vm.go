@@ -95,6 +95,7 @@ func GetChaincodePackageBytes(spec *pb.ChaincodeSpec) ([]byte, error) {
 	}
 
 	err = platform.WritePackage(spec, tw)
+	vmLogger.Debugf("zws-WritePackage")
 	if err != nil {
 		return nil, err
 	}
