@@ -28,9 +28,8 @@ import (
 
 	_ "net/http/pprof"
 
+	"github.com/hyperledger/fabric/common/flogging"
 	"github.com/hyperledger/fabric/core"
-	"github.com/hyperledger/fabric/core/crypto/primitives"
-	"github.com/hyperledger/fabric/core/flogging"
 	"github.com/hyperledger/fabric/peer/chaincode"
 	"github.com/hyperledger/fabric/peer/clilogging"
 	"github.com/hyperledger/fabric/peer/common"
@@ -50,7 +49,7 @@ var mainCmd = &cobra.Command{
 	Use: "peer",
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 		peerCommand := getPeerCommandFromCobraCommand(cmd)
-		flogging.LoggingInit(peerCommand)
+		flogging.InitFromViper(peerCommand)
 
 		return core.CacheConfiguration()
 	},
@@ -97,10 +96,6 @@ func main() {
 
 	// initialize logging format from core.yaml
 	flogging.SetLoggingFormat(viper.GetString("logging.format"), logOutput)
-
-	// Init the crypto layer
-	//TODO: integrate new crypto / idp code
-	primitives.SetSecurityLevel("SHA2", 256)
 
 	// Init the MSP
 	// TODO: determine the location of this config file

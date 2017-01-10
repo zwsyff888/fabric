@@ -28,7 +28,6 @@ import (
 	"github.com/golang/protobuf/proto"
 	"github.com/hyperledger/fabric/core/chaincode"
 	"github.com/hyperledger/fabric/core/container"
-	"github.com/hyperledger/fabric/core/crypto/primitives"
 	"github.com/hyperledger/fabric/core/peer"
 	"github.com/hyperledger/fabric/core/peer/msp"
 	"github.com/hyperledger/fabric/core/util"
@@ -75,18 +74,6 @@ func initPeer(chainID string) (net.Listener, error) {
 
 	getPeerEndpoint := func() (*pb.PeerEndpoint, error) {
 		return &pb.PeerEndpoint{ID: &pb.PeerID{Name: "testpeer"}, Address: peerAddress}, nil
-	}
-
-	// Install security object for peer
-	if viper.GetBool("security.enabled") {
-		//TODO:  integrate new crypto / idp
-		securityLevel := viper.GetInt("security.level")
-		hashAlgorithm := viper.GetString("security.hashAlgorithm")
-		primitives.SetSecurityLevel(hashAlgorithm, securityLevel)
-	} else {
-		// the primitives need to be instantiated no matter what. Otherwise
-		// the escc code won't have a hash algorithm available to hash the proposal
-		primitives.SetSecurityLevel("SHA2", 256)
 	}
 
 	ccStartupTimeout := time.Duration(30000) * time.Millisecond

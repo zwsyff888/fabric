@@ -31,31 +31,39 @@ import (
 
 // This file is used to bootstrap a gossip instance for integration/demo purposes ONLY
 
+// TODO: This is a temporary fix to make gossip multi-channel work
+//       because we don't support cross-organization gossip yet.
+// 	 this will be removed once we support gossip across orgs.
+var orgId = []byte("ORG1")
+
 func newConfig(selfEndpoint string, bootPeers ...string) *gossip.Config {
 	port, err := strconv.ParseInt(strings.Split(selfEndpoint, ":")[1], 10, 64)
 	if err != nil {
 		panic(err)
 	}
+
 	return &gossip.Config{
-		BindPort:       int(port),
-		BootstrapPeers: bootPeers,
-		ID:             selfEndpoint,
-		MaxMessageCountToStore:     100,
-		MaxPropagationBurstLatency: time.Millisecond * 50,
-		MaxPropagationBurstSize:    3,
+		BindPort:                   int(port),
+		BootstrapPeers:             bootPeers,
+		ID:                         selfEndpoint,
+		MaxBlockCountToStore:       100,
+		MaxPropagationBurstLatency: time.Duration(10) * time.Millisecond,
+		MaxPropagationBurstSize:    10,
 		PropagateIterations:        1,
 		PropagatePeerNum:           3,
-		PullInterval:               time.Second * 5,
+		PullInterval:               time.Duration(4) * time.Second,
 		PullPeerNum:                3,
 		SelfEndpoint:               selfEndpoint,
-		PublishCertPeriod:          time.Duration(time.Second * 4),
+		PublishCertPeriod:          10 * time.Second,
+		RequestStateInfoInterval:   4 * time.Second,
+		PublishStateInfoInterval:   4 * time.Second,
 	}
 }
 
 // NewGossipComponent creates a gossip component that attaches itself to the given gRPC server
 func NewGossipComponent(endpoint string, s *grpc.Server, dialOpts []grpc.DialOption, bootPeers ...string) gossip.Gossip {
 	conf := newConfig(endpoint, bootPeers...)
-	return gossip.NewGossipService(conf, s, &naiveCryptoService{}, []byte(endpoint), dialOpts...)
+	return gossip.NewGossipService(conf, s, &orgCryptoService{}, &naiveCryptoService{}, []byte(endpoint), dialOpts...)
 }
 
 type naiveCryptoService struct {
@@ -89,5 +97,21 @@ func (cs *naiveCryptoService) Verify(vkID api.PeerIdentityType, signature, messa
 	if !bytes.Equal(signature, message) {
 		return fmt.Errorf("Invalid signature")
 	}
+	return nil
+}
+
+type orgCryptoService struct {
+
+}
+
+// OrgByPeerIdentity returns the OrgIdentityType
+// of a given peer identity
+func (*orgCryptoService) OrgByPeerIdentity(identity api.PeerIdentityType) api.OrgIdentityType {
+	return orgId
+}
+
+// Verify verifies a JoinChannelMessage, returns nil on success,
+// and an error on failure
+func (*orgCryptoService) Verify(joinChanMsg api.JoinChannelMessage) error {
 	return nil
 }

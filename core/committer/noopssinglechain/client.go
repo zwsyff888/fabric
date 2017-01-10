@@ -25,6 +25,7 @@ import (
 	"github.com/hyperledger/fabric/core/committer/txvalidator"
 	"github.com/hyperledger/fabric/core/peer"
 	"github.com/hyperledger/fabric/events/producer"
+	gossipcommon "github.com/hyperledger/fabric/gossip/common"
 	gossip_proto "github.com/hyperledger/fabric/gossip/proto"
 	"github.com/hyperledger/fabric/gossip/service"
 	"github.com/hyperledger/fabric/protos/common"
@@ -38,8 +39,7 @@ import (
 var logger *logging.Logger // package-level logger
 
 func init() {
-	logger = logging.MustGetLogger("committer")
-	logging.SetLevel(logging.DEBUG, logger.Module)
+	logger = logging.MustGetLogger("noopssinglechain.client")
 }
 
 // DeliverService used to communicate with orderers to obtain
@@ -192,13 +192,15 @@ func (d *DeliverService) readUntilClose() {
 			// Create new transactions validator
 			validator := txvalidator.NewTxValidator(peer.GetLedger(d.chainID))
 			// Validate and mark invalid transactions
+			logger.Debug("Validating block, chainID", d.chainID)
 			validator.Validate(t.Block)
 
-			numberOfPeers := len(service.GetGossipService().GetPeers())
+			numberOfPeers := len(service.GetGossipService().PeersOfChannel(gossipcommon.ChainID(d.chainID)))
 			// Create payload with a block received
 			payload := createPayload(seqNum, t.Block)
 			// Use payload to create gossip message
-			gossipMsg := createGossipMsg(payload)
+			gossipMsg := createGossipMsg(d.chainID, payload)
+			logger.Debug("Creating gossip message", gossipMsg)
 
 			logger.Debugf("Adding payload locally, buffer seqNum = [%d], peers number [%d]", seqNum, numberOfPeers)
 			// Add payload to local state payloads buffer
@@ -218,15 +220,16 @@ func (d *DeliverService) readUntilClose() {
 	}
 }
 
-func createGossipMsg(payload *gossip_proto.Payload) *gossip_proto.GossipMessage {
+func createGossipMsg(chainID string, payload *gossip_proto.Payload) *gossip_proto.GossipMessage {
 	gossipMsg := &gossip_proto.GossipMessage{
-		Nonce: 0,
+		Nonce:   0,
+		Tag:     gossip_proto.GossipMessage_CHAN_AND_ORG,
+		Channel: []byte(chainID),
 		Content: &gossip_proto.GossipMessage_DataMsg{
 			DataMsg: &gossip_proto.DataMessage{
 				Payload: payload,
 			},
 		},
-		Tag: gossip_proto.GossipMessage_EMPTY,
 	}
 	return gossipMsg
 }

@@ -21,9 +21,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/hyperledger/fabric/core/crypto/primitives"
+	"github.com/hyperledger/fabric/common/flogging"
 	"github.com/hyperledger/fabric/core/errors"
-	"github.com/hyperledger/fabric/core/flogging"
 	"github.com/hyperledger/fabric/core/peer"
 	"github.com/hyperledger/fabric/core/peer/msp"
 	"github.com/hyperledger/fabric/msp"
@@ -62,10 +61,6 @@ func InitConfig(cmdRoot string) error {
 
 //InitCrypto initializes crypto for this peer
 func InitCrypto(mspMgrConfigDir string) error {
-	// Init the crypto layer
-	//TODO: integrate new crypto / idp code
-	primitives.SetSecurityLevel("SHA2", 256)
-
 	// FIXME: when this peer joins a chain, it should get the
 	// config for that chain with the list of MSPs that the
 	// chain uses; however this is not yet implemented.
@@ -106,7 +101,7 @@ func GetAdminClient() (pb.AdminClient, error) {
 // core.yaml
 func SetErrorLoggingLevel() error {
 	viperErrorLoggingLevel := viper.GetString("logging.error")
-	_, err := flogging.SetModuleLogLevel("error", viperErrorLoggingLevel)
+	_, err := flogging.SetModuleLevel("error", viperErrorLoggingLevel)
 
 	return err
 }

@@ -31,7 +31,7 @@ import (
 var logger = logging.MustGetLogger("orderer/config")
 
 func init() {
-	logging.SetLevel(logging.DEBUG, "")
+	logging.SetLevel(logging.ERROR, "")
 }
 
 // Prefix is the default config prefix for the orderer
@@ -48,7 +48,9 @@ type General struct {
 	ListenPort    uint16
 	GenesisMethod string
 	BatchSize     BatchSize
+	GenesisFile   string
 	Profile       Profile
+	LogLevel      string
 }
 
 // BatchSize contains configuration affecting the size of batches
@@ -112,10 +114,12 @@ var defaults = TopLevel{
 		BatchSize: BatchSize{
 			MaxMessageCount: 10,
 		},
+		GenesisFile: "./genesisblock",
 		Profile: Profile{
 			Enabled: false,
 			Address: "0.0.0.0:6060",
 		},
+		LogLevel: "INFO",
 	},
 	RAMLedger: RAMLedger{
 		HistorySize: 10000,
@@ -164,8 +168,13 @@ func (c *TopLevel) completeInitialization() {
 		case c.General.ListenPort == 0:
 			logger.Infof("General.ListenPort unset, setting to %s", defaults.General.ListenPort)
 			c.General.ListenPort = defaults.General.ListenPort
+		case c.General.LogLevel == "":
+			logger.Infof("General.LogLevel unset, setting to %s", defaults.General.LogLevel)
+			c.General.LogLevel = defaults.General.LogLevel
 		case c.General.GenesisMethod == "":
 			c.General.GenesisMethod = defaults.General.GenesisMethod
+		case c.General.GenesisFile == "":
+			c.General.GenesisFile = defaults.General.GenesisFile
 		case c.General.Profile.Enabled && (c.General.Profile.Address == ""):
 			logger.Infof("Profiling enabled and General.Profile.Address unset, setting to %s", defaults.General.Profile.Address)
 			c.General.Profile.Address = defaults.General.Profile.Address
