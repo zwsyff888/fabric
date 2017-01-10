@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-		 http://www.apache.org/licenses/LICENSE-2.0
+                 http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -14,11 +14,18 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package crypto
+package policies
 
-// SignatureVerifier verifies signatures
-type SignatureVerifier interface {
+import (
+	"testing"
 
-	// Verify verifies signature sig against verification key vk and message msg.
-	Verify(vk, sig, msg []byte) (bool, error)
+	"github.com/hyperledger/fabric/common/policies"
+)
+
+func TestPolicyManagerInterface(t *testing.T) {
+	_ = policies.Manager(&Manager{})
+}
+
+func TestPolicyInterface(t *testing.T) {
+	_ = policies.Policy(&Policy{})
 }
