@@ -25,7 +25,7 @@ import (
 	"github.com/hyperledger/fabric/orderer/common/sharedconfig"
 	"github.com/hyperledger/fabric/orderer/rawledger"
 	cb "github.com/hyperledger/fabric/protos/common"
-	ab "github.com/hyperledger/fabric/protos/orderer"
+	"github.com/hyperledger/fabric/protos/utils"
 	"github.com/op/go-logging"
 
 	"github.com/golang/protobuf/proto"
@@ -39,6 +39,23 @@ type xxxCryptoHelper struct{}
 
 func (xxx xxxCryptoHelper) VerifySignature(sd *cb.SignedData) error {
 	return nil
+}
+
+func (xxx xxxCryptoHelper) NewSignatureHeader() *cb.SignatureHeader {
+	return &cb.SignatureHeader{}
+}
+
+func (xxx xxxCryptoHelper) Sign(message []byte) []byte {
+	return message
+}
+
+// Signer is a temporary stub interface which will be implemented by the local MSP
+type Signer interface {
+	// NewSignatureHeader creates a SignatureHeader with the correct signing identity and a valid nonce
+	NewSignatureHeader() *cb.SignatureHeader
+
+	// Sign a message which should embed a signature header created by NewSignatureHeader
+	Sign(message []byte) []byte
 }
 
 // Manager coordinates the creation and access of chains
@@ -59,48 +76,18 @@ type multiLedger struct {
 	sysChain      *systemChain
 }
 
-// getConfigTx, this should ultimately be done more intelligently, but for now, we search the whole chain for txs and pick the last config one
 func getConfigTx(reader rawledger.Reader) *cb.Envelope {
-	var lastConfigTx *cb.Envelope
-
-	it, _ := reader.Iterator(&ab.SeekPosition{Type: &ab.SeekPosition_Oldest{}})
-	// Iterate over the blockchain, looking for config transactions, track the most recent one encountered
-	// this will be the transaction which is returned
-	for {
-		select {
-		case <-it.ReadyChan():
-			block, status := it.Next()
-			if status != cb.Status_SUCCESS {
-				logger.Fatalf("Error parsing blockchain at startup: %v", status)
-			}
-			// ConfigTxs should always be by themselves
-			if len(block.Data.Data) != 1 {
-				continue
-			}
-
-			maybeConfigTx := &cb.Envelope{}
-
-			err := proto.Unmarshal(block.Data.Data[0], maybeConfigTx)
-
-			if err != nil {
-				logger.Fatalf("Found data which was not an envelope: %s", err)
-			}
-
-			payload := &cb.Payload{}
-			if err = proto.Unmarshal(maybeConfigTx.Payload, payload); err != nil {
-				logger.Fatalf("Unable to unmarshal transaction payload: %s", err)
-			}
-
-			if payload.Header.ChainHeader.Type != int32(cb.HeaderType_CONFIGURATION_TRANSACTION) {
-				continue
-			}
-
-			logger.Debugf("Found configuration transaction for chain %x at block %d", payload.Header.ChainHeader.ChainID, block.Header.Number)
-			lastConfigTx = maybeConfigTx
-		default:
-			return lastConfigTx
-		}
+	lastBlock := rawledger.GetBlock(reader, reader.Height()-1)
+	index, err := utils.GetLastConfigurationIndexFromBlock(lastBlock)
+	if err != nil {
+		logger.Panicf("Chain did not have appropriately encoded last configuration in its latest block: %s", err)
 	}
+	configBlock := rawledger.GetBlock(reader, index)
+	if configBlock == nil {
+		logger.Panicf("Configuration block does not exist")
+	}
+
+	return utils.ExtractEnvelopeOrPanic(configBlock, 0)
 }
 
 // NewManagerImpl produces an instance of a Manager
@@ -126,17 +113,29 @@ func NewManagerImpl(ledgerFactory rawledger.Factory, consenters map[string]Conse
 
 		if sharedConfigManager.ChainCreators() != nil {
 			if ml.sysChain != nil {
-				logger.Fatalf("There appear to be two system chains %x and %x", ml.sysChain.support.ChainID(), chainID)
+				logger.Fatalf("There appear to be two system chains %s and %s", ml.sysChain.support.ChainID(), chainID)
 			}
 			logger.Debugf("Starting with system chain: %x", chainID)
-			chain := newChainSupport(createSystemChainFilters(ml, configManager), configManager, policyManager, backingLedger, sharedConfigManager, consenters)
+			chain := newChainSupport(createSystemChainFilters(ml, configManager, policyManager, sharedConfigManager),
+				configManager,
+				policyManager,
+				backingLedger,
+				sharedConfigManager,
+				consenters,
+				&xxxCryptoHelper{})
 			ml.chains[string(chainID)] = chain
 			ml.sysChain = newSystemChain(chain)
 			// We delay starting this chain, as it might try to copy and replace the chains map via newChain before the map is fully built
 			defer chain.start()
 		} else {
 			logger.Debugf("Starting chain: %x", chainID)
-			chain := newChainSupport(createStandardFilters(configManager), configManager, policyManager, backingLedger, sharedConfigManager, consenters)
+			chain := newChainSupport(createStandardFilters(configManager, policyManager, sharedConfigManager),
+				configManager,
+				policyManager,
+				backingLedger,
+				sharedConfigManager,
+				consenters,
+				&xxxCryptoHelper{})
 			ml.chains[string(chainID)] = chain
 			chain.start()
 		}
@@ -230,7 +229,7 @@ func (ml *multiLedger) systemChain() *systemChain {
 
 func (ml *multiLedger) newChain(configtx *cb.Envelope) {
 	configManager, policyManager, backingLedger, sharedConfig := ml.newResources(configtx)
-	backingLedger.Append([]*cb.Envelope{configtx}, nil)
+	backingLedger.Append(rawledger.CreateNextBlock(backingLedger, []*cb.Envelope{configtx}))
 
 	// Copy the map to allow concurrent reads from broadcast/deliver while the new chainSupport is
 	newChains := make(map[string]*chainSupport)
@@ -238,7 +237,7 @@ func (ml *multiLedger) newChain(configtx *cb.Envelope) {
 		newChains[key] = value
 	}
 
-	cs := newChainSupport(createStandardFilters(configManager), configManager, policyManager, backingLedger, sharedConfig, ml.consenters)
+	cs := newChainSupport(createStandardFilters(configManager, policyManager, sharedConfig), configManager, policyManager, backingLedger, sharedConfig, ml.consenters, &xxxCryptoHelper{})
 	chainID := configManager.ChainID()
 
 	logger.Debugf("Created and starting new chain %s", chainID)

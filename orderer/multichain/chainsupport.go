@@ -19,13 +19,15 @@ package multichain
 import (
 	"github.com/hyperledger/fabric/common/configtx"
 	"github.com/hyperledger/fabric/common/policies"
+	"github.com/hyperledger/fabric/common/util"
 	"github.com/hyperledger/fabric/orderer/common/blockcutter"
 	"github.com/hyperledger/fabric/orderer/common/broadcast"
-	"github.com/hyperledger/fabric/orderer/common/deliver"
 	"github.com/hyperledger/fabric/orderer/common/filter"
 	"github.com/hyperledger/fabric/orderer/common/sharedconfig"
+	"github.com/hyperledger/fabric/orderer/common/sigfilter"
 	"github.com/hyperledger/fabric/orderer/rawledger"
 	cb "github.com/hyperledger/fabric/protos/common"
+	"github.com/hyperledger/fabric/protos/utils"
 )
 
 // Consenter defines the backing ordering mechanism
@@ -57,16 +59,26 @@ type Chain interface {
 
 // ConsenterSupport provides the resources available to a Consenter implementation
 type ConsenterSupport interface {
+	Signer
 	BlockCutter() blockcutter.Receiver
 	SharedConfig() sharedconfig.Manager
-	WriteBlock(data []*cb.Envelope, metadata [][]byte, committers []filter.Committer)
+	CreateNextBlock(messages []*cb.Envelope) *cb.Block
+	WriteBlock(block *cb.Block, committers []filter.Committer) *cb.Block
 	ChainID() string // ChainID returns the chain ID this specific consenter instance is associated with
 }
 
 // ChainSupport provides a wrapper for the resources backing a chain
 type ChainSupport interface {
+	// This interface is actually the union with the deliver.Support but because of a golang
+	// limitation https://github.com/golang/go/issues/6977 the methods must be explicitly declared
+
+	// PolicyManager returns the current policy manager as specified by the chain configuration
+	PolicyManager() policies.Manager
+
+	// Reader returns the chain Reader for the chain
+	Reader() rawledger.Reader
+
 	broadcast.Support
-	deliver.Support
 	ConsenterSupport
 
 	// ConfigTxManager returns the corresponding configtx.Manager for this chain
@@ -81,6 +93,9 @@ type chainSupport struct {
 	sharedConfigManager sharedconfig.Manager
 	ledger              rawledger.ReadWriter
 	filters             *filter.RuleSet
+	signer              Signer
+	lastConfiguration   uint64
+	lastConfigSeq       uint64
 }
 
 func newChainSupport(
@@ -90,6 +105,7 @@ func newChainSupport(
 	backing rawledger.ReadWriter,
 	sharedConfigManager sharedconfig.Manager,
 	consenters map[string]Consenter,
+	signer Signer,
 ) *chainSupport {
 
 	cutter := blockcutter.NewReceiverImpl(sharedConfigManager, filters)
@@ -106,6 +122,7 @@ func newChainSupport(
 		cutter:              cutter,
 		filters:             filters,
 		ledger:              backing,
+		signer:              signer,
 	}
 
 	var err error
@@ -118,9 +135,10 @@ func newChainSupport(
 }
 
 // createStandardFilters creates the set of filters for a normal (non-system) chain
-func createStandardFilters(configManager configtx.Manager) *filter.RuleSet {
+func createStandardFilters(configManager configtx.Manager, policyManager policies.Manager, sharedConfig sharedconfig.Manager) *filter.RuleSet {
 	return filter.NewRuleSet([]filter.Rule{
 		filter.EmptyRejectRule,
+		sigfilter.New(sharedConfig.IngressPolicy, policyManager),
 		configtx.NewFilter(configManager),
 		filter.AcceptRule,
 	})
@@ -128,9 +146,10 @@ func createStandardFilters(configManager configtx.Manager) *filter.RuleSet {
 }
 
 // createSystemChainFilters creates the set of filters for the ordering system chain
-func createSystemChainFilters(ml *multiLedger, configManager configtx.Manager) *filter.RuleSet {
+func createSystemChainFilters(ml *multiLedger, configManager configtx.Manager, policyManager policies.Manager, sharedConfig sharedconfig.Manager) *filter.RuleSet {
 	return filter.NewRuleSet([]filter.Rule{
 		filter.EmptyRejectRule,
+		sigfilter.New(sharedConfig.IngressPolicy, policyManager),
 		newSystemChainFilter(ml),
 		configtx.NewFilter(configManager),
 		filter.AcceptRule,
@@ -139,6 +158,14 @@ func createSystemChainFilters(ml *multiLedger, configManager configtx.Manager) *
 
 func (cs *chainSupport) start() {
 	cs.chain.Start()
+}
+
+func (cs *chainSupport) NewSignatureHeader() *cb.SignatureHeader {
+	return cs.signer.NewSignatureHeader()
+}
+
+func (cs *chainSupport) Sign(message []byte) []byte {
+	return cs.signer.Sign(message)
 }
 
 func (cs *chainSupport) SharedConfig() sharedconfig.Manager {
@@ -173,10 +200,65 @@ func (cs *chainSupport) Enqueue(env *cb.Envelope) bool {
 	return cs.chain.Enqueue(env)
 }
 
-func (cs *chainSupport) WriteBlock(data []*cb.Envelope, metadata [][]byte, committers []filter.Committer) {
+func (cs *chainSupport) CreateNextBlock(messages []*cb.Envelope) *cb.Block {
+	return rawledger.CreateNextBlock(cs.ledger, messages)
+}
+
+func (cs *chainSupport) addBlockSignature(block *cb.Block) {
+	logger.Debugf("%+v", cs)
+	logger.Debugf("%+v", cs.signer)
+	blockSignature := &cb.MetadataSignature{
+		SignatureHeader: utils.MarshalOrPanic(cs.signer.NewSignatureHeader()),
+	}
+
+	// Note, this value is intentionally nil, as this metadata is only about the signature, there is no additional metadata
+	// information required beyond the fact that the metadata item is signed.
+	blockSignatureValue := []byte(nil)
+
+	blockSignature.Signature = cs.signer.Sign(util.ConcatenateBytes(blockSignatureValue, blockSignature.SignatureHeader, block.Header.Bytes()))
+
+	block.Metadata.Metadata[cb.BlockMetadataIndex_SIGNATURES] = utils.MarshalOrPanic(&cb.Metadata{
+		Value: blockSignatureValue,
+		Signatures: []*cb.MetadataSignature{
+			blockSignature,
+		},
+	})
+}
+
+func (cs *chainSupport) addLastConfigSignature(block *cb.Block) {
+	configSeq := cs.configManager.Sequence()
+	if configSeq > cs.lastConfigSeq {
+		cs.lastConfiguration = block.Header.Number
+		cs.lastConfigSeq = configSeq
+	}
+
+	lastConfigSignature := &cb.MetadataSignature{
+		SignatureHeader: utils.MarshalOrPanic(cs.signer.NewSignatureHeader()),
+	}
+
+	lastConfigValue := utils.MarshalOrPanic(&cb.LastConfiguration{Index: cs.lastConfiguration})
+
+	lastConfigSignature.Signature = cs.signer.Sign(util.ConcatenateBytes(lastConfigValue, lastConfigSignature.SignatureHeader, block.Header.Bytes()))
+
+	block.Metadata.Metadata[cb.BlockMetadataIndex_LAST_CONFIGURATION] = utils.MarshalOrPanic(&cb.Metadata{
+		Value: lastConfigValue,
+		Signatures: []*cb.MetadataSignature{
+			lastConfigSignature,
+		},
+	})
+}
+
+func (cs *chainSupport) WriteBlock(block *cb.Block, committers []filter.Committer) *cb.Block {
 	for _, committer := range committers {
 		committer.Commit()
 	}
 
-	cs.ledger.Append(data, metadata)
+	cs.addBlockSignature(block)
+	cs.addLastConfigSignature(block)
+
+	err := cs.ledger.Append(block)
+	if err != nil {
+		logger.Panicf("Could not append block: %s", err)
+	}
+	return block
 }

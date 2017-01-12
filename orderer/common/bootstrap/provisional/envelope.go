@@ -28,6 +28,8 @@ func (cbs *commonBootstrapper) makeGenesisConfigEnvelope() *cb.ConfigurationEnve
 		cbs.encodeBatchTimeout(),
 		cbs.encodeChainCreators(),
 		cbs.encodeAcceptAllPolicy(),
+		cbs.encodeIngressPolicy(),
+		cbs.encodeEgressPolicy(),
 		cbs.lockDefaultModificationPolicy(),
 	)
 }
@@ -40,6 +42,8 @@ func (kbs *kafkaBootstrapper) makeGenesisConfigEnvelope() *cb.ConfigurationEnvel
 		kbs.encodeKafkaBrokers(),
 		kbs.encodeChainCreators(),
 		kbs.encodeAcceptAllPolicy(),
+		kbs.encodeIngressPolicy(),
+		kbs.encodeEgressPolicy(),
 		kbs.lockDefaultModificationPolicy(),
 	)
 }

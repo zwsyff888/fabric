@@ -21,7 +21,7 @@ import (
 
 	"github.com/hyperledger/fabric/common/configtx"
 	"github.com/hyperledger/fabric/common/policies"
-	"github.com/hyperledger/fabric/core/util"
+	"github.com/hyperledger/fabric/common/util"
 	"github.com/hyperledger/fabric/orderer/common/filter"
 	"github.com/hyperledger/fabric/orderer/common/sharedconfig"
 	cb "github.com/hyperledger/fabric/protos/common"
@@ -124,6 +124,9 @@ func (sc *systemChain) proposeChain(configTx *cb.Envelope) cb.Status {
 				ChainID: sc.support.ChainID(),
 				Type:    int32(cb.HeaderType_ORDERER_TRANSACTION),
 			},
+			SignatureHeader: &cb.SignatureHeader{
+			// XXX Appropriately set the signing identity and nonce here
+			},
 		},
 		Data: marshaledEnv,
 	}
@@ -194,7 +197,7 @@ func (sc *systemChain) authorize(configEnvelope *cb.ConfigurationEnvelope) cb.St
 			// Do not include the creation policy
 			continue
 		}
-		remainingBytes = append(remainingBytes, item.ConfigurationItem...)
+		remainingBytes = util.ConcatenateBytes(remainingBytes, item.ConfigurationItem)
 	}
 
 	configHash := util.ComputeCryptoHash(remainingBytes)

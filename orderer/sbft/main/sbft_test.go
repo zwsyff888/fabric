@@ -27,18 +27,17 @@ import (
 	"github.com/hyperledger/fabric/orderer/common/bootstrap/provisional"
 	cb "github.com/hyperledger/fabric/protos/common"
 	ab "github.com/hyperledger/fabric/protos/orderer"
+	"github.com/hyperledger/fabric/protos/utils"
 	"github.com/op/go-logging"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 )
 
-var logger = logging.MustGetLogger("sbft_test")
+const update byte = 0
+const sent byte = 1
 
-var UPDATE byte = 0
-var SEND byte = 1
-
-var NEEDED_UPDATES = 2
-var NEEDED_SENT = 1
+const neededUpdates = 2
+const neededSent = 1
 
 func TestSbftPeer(t *testing.T) {
 	t.Parallel()
@@ -108,18 +107,18 @@ func checkResults(t *testing.T, resultch chan byte, errorch chan error) {
 		select {
 		case result := <-resultch:
 			switch result {
-			case UPDATE:
+			case update:
 				updates++
-			case SEND:
+			case sent:
 				sentBroadcast++
 			}
 		case <-time.After(30 * time.Second):
 			continue
 		}
 	}
-	if updates != NEEDED_UPDATES {
+	if updates != neededUpdates {
 		t.Errorf("We did not get all the ledger updates.")
-	} else if sentBroadcast != NEEDED_SENT {
+	} else if sentBroadcast != neededSent {
 		t.Errorf("We were unable to send all the broadcasts.")
 	} else {
 		logger.Info("Successfully sent and received everything.")
@@ -133,11 +132,20 @@ func updateReceiver(t *testing.T, resultch chan byte, errorch chan error, client
 		errorch <- fmt.Errorf("Failed to get Deliver stream: %s", err)
 		return
 	}
-	err = dstream.Send(&ab.SeekInfo{
-		ChainID:  provisional.TestChainID,
-		Start:    &ab.SeekPosition{Type: &ab.SeekPosition_Newest{Newest: &ab.SeekNewest{}}},
-		Stop:     &ab.SeekPosition{Type: &ab.SeekPosition_Specified{Specified: &ab.SeekSpecified{Number: ^uint64(0)}}},
-		Behavior: ab.SeekInfo_BLOCK_UNTIL_READY,
+	err = dstream.Send(&cb.Envelope{
+		Payload: utils.MarshalOrPanic(&cb.Payload{
+			Header: &cb.Header{
+				ChainHeader: &cb.ChainHeader{
+					ChainID: provisional.TestChainID,
+				},
+				SignatureHeader: &cb.SignatureHeader{},
+			},
+			Data: utils.MarshalOrPanic(&ab.SeekInfo{
+				Start:    &ab.SeekPosition{Type: &ab.SeekPosition_Newest{Newest: &ab.SeekNewest{}}},
+				Stop:     &ab.SeekPosition{Type: &ab.SeekPosition_Specified{Specified: &ab.SeekSpecified{Number: ^uint64(0)}}},
+				Behavior: ab.SeekInfo_BLOCK_UNTIL_READY,
+			}),
+		}),
 	})
 	if err != nil {
 		errorch <- fmt.Errorf("Failed to send to Deliver stream: %s", err)
@@ -162,7 +170,7 @@ func updateReceiver(t *testing.T, resultch chan byte, errorch chan error, client
 				logger.Infof("{Update Receiver} %d - %v", i+1, pl.Data)
 			}
 		}
-		resultch <- UPDATE
+		resultch <- update
 	}
 	logger.Info("{Update Receiver} Exiting...")
 }
@@ -184,5 +192,5 @@ func broadcastSender(t *testing.T, resultch chan byte, errorch chan error, clien
 	bstream.Send(&cb.Envelope{Payload: mpl})
 	logger.Infof("{Broadcast Sender} Broadcast sent: %v", bs)
 	logger.Info("{Broadcast Sender} Exiting...")
-	resultch <- SEND
+	resultch <- sent
 }
