@@ -236,7 +236,7 @@ func (msp *bccspmsp) Validate(id Identity) error {
 		for _, v := range msp.trustedCerts {
 			opts.Roots.AddCert(v.(*identity).cert)
 		}
-
+		mspLogger.Info("opts,%v,id,%v", opts, id)
 		_, err := id.(*identity).cert.Verify(opts)
 		if err != nil {
 			return fmt.Errorf("The supplied identity is not valid, Verify() returned %s", err)
