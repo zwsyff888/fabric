@@ -55,7 +55,6 @@ var remoteStateMsgFilter = func(message interface{}) bool {
 	return message.(comm.ReceivedMessage).GetGossipMessage().IsRemoteStateMessage()
 }
 
-
 const (
 	defPollingPeriod       = 200 * time.Millisecond
 	defAntiEntropyInterval = 10 * time.Second
@@ -337,7 +336,7 @@ func (s *GossipStateProviderImpl) antiEntropy() {
 			continue
 		}
 
-		s.logger.Debugf("Requesting new blocks in range [%d...%d].", current+1, max)
+		//s.logger.Debugf("Requesting new blocks in range [%d...%d].", current+1, max)
 		s.requestBlocksInRange(uint64(current+1), uint64(max))
 	}
 	s.logger.Debug("[XXX]: Stateprovider stopped, stoping anti entropy procedure.")

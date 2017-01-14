@@ -1,5 +1,5 @@
 /*
-Copyright IBM Corp. 2016 All Rights Reserved.
+Copyright IBM Corp. 2017 All Rights Reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,23 +14,19 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package main
+package genesis
 
 import (
+	"testing"
+
 	"github.com/hyperledger/fabric/common/configtx"
-	"github.com/hyperledger/fabric/orderer/common/bootstrap/provisional"
 	cb "github.com/hyperledger/fabric/protos/common"
 )
 
-func newChainRequest(consensusType, creationPolicy, newChainID string) *cb.Envelope {
-	conf.Genesis.OrdererType = consensusType
-	generator := provisional.New(conf)
-	items := generator.TemplateItems()
-	simpleTemplate := configtx.NewSimpleTemplate(items...)
-
-	env, err := configtx.MakeChainCreationTransaction(creationPolicy, newChainID, simpleTemplate)
+func TestSanity(t *testing.T) {
+	impl := NewFactoryImpl(configtx.NewSimpleTemplate(&cb.ConfigurationItem{}))
+	_, err := impl.Block("TestChainID")
 	if err != nil {
-		panic(err)
+		t.Fatalf("Basic sanity fails")
 	}
-	return env
 }

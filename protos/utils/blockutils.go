@@ -23,11 +23,8 @@ import (
 
 	"github.com/golang/protobuf/proto"
 
-	"github.com/hyperledger/fabric/common/cauthdsl"
-	"github.com/hyperledger/fabric/common/configtx"
 	"github.com/hyperledger/fabric/msp"
 	cb "github.com/hyperledger/fabric/protos/common"
-	ab "github.com/hyperledger/fabric/protos/orderer"
 )
 
 // GetChainIDFromBlock returns chain ID in the block
@@ -98,48 +95,12 @@ func InitBlockMetadata(block *cb.Block) {
 	}
 }
 
-// MakeConfigurationBlock creates a mock configuration block for testing in
-// various modules. This is a convenient function rather than every test
-// implements its own
-func MakeConfigurationBlock(testChainID string) (*cb.Block, error) {
-	configItemChainHeader := MakeChainHeader(cb.HeaderType_CONFIGURATION_ITEM,
-		messageVersion, testChainID, epoch)
-
-	configEnvelope := MakeConfigurationEnvelope(
-		encodeConsensusType(testChainID),
-		encodeBatchSize(testChainID),
-		lockDefaultModificationPolicy(testChainID),
-		encodeMSP(testChainID),
-	)
-	payloadChainHeader := MakeChainHeader(cb.HeaderType_CONFIGURATION_TRANSACTION,
-		configItemChainHeader.Version, testChainID, epoch)
-	payloadSignatureHeader := MakeSignatureHeader(nil, CreateNonceOrPanic())
-	payloadHeader := MakePayloadHeader(payloadChainHeader, payloadSignatureHeader)
-	payload := &cb.Payload{Header: payloadHeader, Data: MarshalOrPanic(configEnvelope)}
-	envelope := &cb.Envelope{Payload: MarshalOrPanic(payload), Signature: nil}
-
-	blockData := &cb.BlockData{Data: [][]byte{MarshalOrPanic(envelope)}}
-
-	return &cb.Block{
-		Header: &cb.BlockHeader{
-			Number:       0,
-			PreviousHash: nil,
-			DataHash:     blockData.Hash(),
-		},
-		Data:     blockData,
-		Metadata: nil,
-	}, nil
-}
-
 const (
-	batchSize        = 10
-	consensusType    = "solo"
-	epoch            = uint64(0)
-	messageVersion   = int32(1)
-	lastModified     = uint64(0)
-	consensusTypeKey = "ConsensusType"
-	batchSizeKey     = "BatchSize"
-	mspKey           = "MSP"
+	epoch                           = uint64(0)
+	messageVersion                  = int32(1)
+	lastModified                    = uint64(0)
+	mspKey                          = "MSP"
+	XXX_DefaultModificationPolicyID = "DefaultModificationPolicy" // Break an import cycle during work to remove the below configtx construction methods
 )
 
 func createSignedConfigItem(chainID string,
@@ -158,27 +119,6 @@ func createSignedConfigItem(chainID string,
 		Signatures:        nil}
 }
 
-func encodeConsensusType(testChainID string) *cb.SignedConfigurationItem {
-	return createSignedConfigItem(testChainID,
-		consensusTypeKey,
-		MarshalOrPanic(&ab.ConsensusType{Type: consensusType}),
-		configtx.DefaultModificationPolicyID)
-}
-
-func encodeBatchSize(testChainID string) *cb.SignedConfigurationItem {
-	return createSignedConfigItem(testChainID,
-		batchSizeKey,
-		MarshalOrPanic(&ab.BatchSize{MaxMessageCount: batchSize}),
-		configtx.DefaultModificationPolicyID)
-}
-
-func lockDefaultModificationPolicy(testChainID string) *cb.SignedConfigurationItem {
-	return createSignedConfigItem(testChainID,
-		configtx.DefaultModificationPolicyID,
-		MarshalOrPanic(MakePolicyOrPanic(cauthdsl.RejectAllPolicy)),
-		configtx.DefaultModificationPolicyID)
-}
-
 // This function is needed to locate the MSP test configuration when running
 // in CI build env or local with "make unit-test". A better way to manage this
 // is to define a config path in yaml that may point to test or production
@@ -191,7 +131,7 @@ func getTESTMSPConfigPath() string {
 	return cfgPath
 }
 
-func encodeMSP(testChainID string) *cb.SignedConfigurationItem {
+func EncodeMSP(testChainID string) *cb.SignedConfigurationItem {
 	cfgPath := getTESTMSPConfigPath()
 	conf, err := msp.GetLocalMspConfig(cfgPath)
 	if err != nil {
@@ -200,5 +140,5 @@ func encodeMSP(testChainID string) *cb.SignedConfigurationItem {
 	return createSignedConfigItem(testChainID,
 		mspKey,
 		MarshalOrPanic(conf),
-		configtx.DefaultModificationPolicyID)
+		XXX_DefaultModificationPolicyID)
 }
