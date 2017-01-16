@@ -41,6 +41,9 @@ class Test(CompositionCallback):
     def getEnv(self, composition, context, env):
         pass
 
+def GetDockerSafeUUID():
+    return str(uuid.uuid1()).replace('-','')
+
 class Composition:
 
     @classmethod
@@ -56,10 +59,11 @@ class Composition:
         return context.compositionCallbacks
 
 
-    def GetUUID():
-        return str(uuid.uuid1()).replace('-','')
+    @classmethod
+    def GetUUID(cls):
+        return GetDockerSafeUUID()
 
-    def __init__(self, context, composeFilesYaml, projectName = GetUUID()):
+    def __init__(self, context, composeFilesYaml, projectName = GetDockerSafeUUID()):
         self.projectName = projectName
         self.context = context
         self.containerDataList = []
@@ -127,10 +131,13 @@ class Composition:
             # container environment
             container_env = container['Config']['Env']
 
+            # container exposed ports
+            container_ports = container['NetworkSettings']['Ports']
+
             # container docker-compose service
             container_compose_service = container['Config']['Labels']['com.docker.compose.service']
 
-            self.containerDataList.append(peer_basic_impl.ContainerData(container_name, container_ipaddress, container_env, container_compose_service))
+            self.containerDataList.append(peer_basic_impl.ContainerData(container_name, container_ipaddress, container_env, container_compose_service, container_ports))
 
     def decompose(self):
         self.issueCommand(["unpause"])
