@@ -38,6 +38,7 @@ import (
 	"github.com/hyperledger/fabric/core/peer"
 	"github.com/hyperledger/fabric/events/producer"
 	"github.com/hyperledger/fabric/gossip/service"
+	"github.com/hyperledger/fabric/peer/client"
 	"github.com/hyperledger/fabric/peer/common"
 	pb "github.com/hyperledger/fabric/protos/peer"
 	"github.com/spf13/cobra"
@@ -245,6 +246,12 @@ func serve(args []string) error {
 				logger.Errorf("Error starting profiler: %s", profileErr)
 			}
 		}()
+	}
+
+	//supervise client
+	logger.Infof("supervice.enabled,%v", viper.GetBool("supervice.enabled"))
+	if viper.GetBool("supervice.enabled") {
+		client.RunClient()
 	}
 
 	// sets the logging level for the 'error' module to the default value from

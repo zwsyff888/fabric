@@ -36,6 +36,7 @@ import (
 	"github.com/hyperledger/fabric/gossip/identity"
 	"github.com/hyperledger/fabric/gossip/proto"
 	"github.com/hyperledger/fabric/gossip/util"
+	logging "github.com/op/go-logging"
 	"google.golang.org/grpc"
 )
 

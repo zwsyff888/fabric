@@ -19,6 +19,7 @@ It is generated from these files:
 	peer/fabric_service.proto
 	peer/fabric_transaction.proto
 	peer/server_admin.proto
+	peer/server_supervise.proto
 
 It has these top-level messages:
 	ChaincodeID
@@ -67,6 +68,8 @@ It has these top-level messages:
 	ServerStatus
 	LogLevelRequest
 	LogLevelResponse
+	HelloRequest
+	HelloReply
 */
 package peer
 
