@@ -1,9 +1,12 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"net"
 
+	"github.com/astaxie/beego"
+	_ "github.com/hyperledger/fabric/bddtests/supervise/server/routers"
 	pb "github.com/hyperledger/fabric/protos/peer"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
@@ -29,7 +32,12 @@ func main() {
 	grpcServer := grpc.NewServer()
 	pb.RegisterGreeterServer(grpcServer, &server{})
 	// Register reflection service on gRPC server.
-	if err := grpcServer.Serve(lis); err != nil {
-		log.Fatalf("failed to serve: %v", err)
-	}
+	go func() {
+		if err := grpcServer.Serve(lis); err != nil {
+			log.Fatalf("failed to serve: %v", err)
+		}
+	}()
+
+	fmt.Printf("START")
+	beego.Run()
 }

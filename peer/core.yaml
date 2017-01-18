@@ -325,4 +325,4 @@ security:
 supervice:
     enabled: true
 
-    address: 127.0.0.1:50051
+    address: 127.0.0.1:6060

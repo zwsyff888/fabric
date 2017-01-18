@@ -2,8 +2,11 @@ package client
 
 import (
 	"context"
+	"fmt"
 	"time"
 
+	"github.com/hyperledger/fabric/common/util"
+	"github.com/hyperledger/fabric/core/peer"
 	"github.com/hyperledger/fabric/gossip/service"
 	pb "github.com/hyperledger/fabric/protos/peer"
 	logging "github.com/op/go-logging"
@@ -21,7 +24,7 @@ var logger = logging.MustGetLogger("client")
 func StartSuperviseClient() {
 	var opts []grpc.DialOption
 	opts = append(opts, grpc.WithInsecure())
-	opts = append(opts, grpc.WithTimeout(3*time.Second))
+	opts = append(opts, grpc.WithTimeout(10*time.Second))
 	opts = append(opts, grpc.WithBlock())
 	conn, err := grpc.Dial(viper.GetString("supervice.address"), opts...)
 	if err != nil {
@@ -43,6 +46,23 @@ func StartSuperviseClient() {
 		logger.Infof("could not greet: %v", err)
 		return
 	}
+	peerEndpoint, err := peer.GetPeerEndpoint()
+
+	if err != nil {
+		err = fmt.Errorf("Failed to get Peer Endpoint: %s", err)
+	}
+
+	committer := peer.GetCommitter(util.GetTestChainID())
+	if committer != nil {
+		ledgerHeight, err := peer.GetCommitter(util.GetTestChainID()).LedgerHeight()
+		if err != nil {
+			err = fmt.Errorf("Failed to get Height: %s", err)
+		}
+		logger.Infof("Height,%v", ledgerHeight)
+	}
+
+	logger.Infof("peerEndpoint,%v", peerEndpoint)
+
 	logger.Infof("Greeting: %s", r.Message)
 }
 
