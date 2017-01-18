@@ -51,7 +51,7 @@ type ccProviderContextImpl struct {
 }
 
 // GetContext returns a context for the supplied ledger, with the appropriate tx simulator
-func (c *ccProviderImpl) GetContext(ledger ledger.ValidatedLedger) (context.Context, error) {
+func (c *ccProviderImpl) GetContext(ledger ledger.PeerLedger) (context.Context, error) {
 	var err error
 	// get context for the chaincode execution
 	c.txsim, err = ledger.NewTxSimulator()
@@ -70,11 +70,11 @@ func (c *ccProviderImpl) GetCCContext(cid, name, version, txid string, syscc boo
 	return &ccProviderContextImpl{ctx: ctx}
 }
 
-// GetVSCCFromLCCC returns the VSCC listed in LCCC for the supplied chaincode
-func (c *ccProviderImpl) GetVSCCFromLCCC(ctxt context.Context, txid string, prop *peer.Proposal, chainID string, chaincodeID string) (string, error) {
+// GetCCValidationInfoFromLCCC returns the VSCC and the policy listed in LCCC for the supplied chaincode
+func (c *ccProviderImpl) GetCCValidationInfoFromLCCC(ctxt context.Context, txid string, prop *peer.Proposal, chainID string, chaincodeID string) (string, []byte, error) {
 	data, err := GetChaincodeDataFromLCCC(ctxt, txid, prop, chainID, chaincodeID)
 	if err != nil {
-		return "", err
+		return "", nil, err
 	}
 
 	vscc := "vscc"
@@ -83,7 +83,7 @@ func (c *ccProviderImpl) GetVSCCFromLCCC(ctxt context.Context, txid string, prop
 		vscc = data.Vscc
 	}
 
-	return vscc, nil
+	return vscc, data.Policy, nil
 }
 
 // ExecuteChaincode executes the chaincode specified in the context with the specified arguments
