@@ -21,7 +21,7 @@ type AnchorPeers struct {
 func (m *AnchorPeers) Reset()                    { *m = AnchorPeers{} }
 func (m *AnchorPeers) String() string            { return proto.CompactTextString(m) }
 func (*AnchorPeers) ProtoMessage()               {}
-func (*AnchorPeers) Descriptor() ([]byte, []int) { return fileDescriptor4, []int{0} }
+func (*AnchorPeers) Descriptor() ([]byte, []int) { return fileDescriptor3, []int{0} }
 
 func (m *AnchorPeers) GetAnchorPees() []*AnchorPeer {
 	if m != nil {
@@ -45,16 +45,20 @@ type AnchorPeer struct {
 func (m *AnchorPeer) Reset()                    { *m = AnchorPeer{} }
 func (m *AnchorPeer) String() string            { return proto.CompactTextString(m) }
 func (*AnchorPeer) ProtoMessage()               {}
-func (*AnchorPeer) Descriptor() ([]byte, []int) { return fileDescriptor4, []int{1} }
+func (*AnchorPeer) Descriptor() ([]byte, []int) { return fileDescriptor3, []int{1} }
 
 func init() {
 	proto.RegisterType((*AnchorPeers)(nil), "protos.AnchorPeers")
 	proto.RegisterType((*AnchorPeer)(nil), "protos.AnchorPeer")
 }
 
-func init() { proto.RegisterFile("peer/configuration.proto", fileDescriptor4) }
+func init() { proto.RegisterFile("peer/configuration.proto", fileDescriptor3) }
 
+<<<<<<< HEAD
 var fileDescriptor4 = []byte{
+=======
+var fileDescriptor3 = []byte{
+>>>>>>> 22ec03f979c0fec9ea55dac1b033a73e4990a205
 	// 188 bytes of a gzipped FileDescriptorProto
 	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x09, 0x6e, 0x88, 0x02, 0xff, 0x4c, 0x8f, 0x31, 0x6f, 0x83, 0x30,
 	0x10, 0x85, 0xe5, 0xd2, 0x56, 0xaa, 0xe9, 0xe4, 0xc9, 0xa3, 0xc5, 0xe4, 0xaa, 0x12, 0x96, 0xe8,

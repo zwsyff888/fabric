@@ -130,6 +130,17 @@ func GetChaincodeAction(caBytes []byte) (*peer.ChaincodeAction, error) {
 	return chaincodeAction, nil
 }
 
+// GetChaincodeEvents gets the ChaincodeEvents given chaicnode event bytes
+func GetChaincodeEvents(eBytes []byte) (*peer.ChaincodeEvent, error) {
+	chaincodeEvent := &peer.ChaincodeEvent{}
+	err := proto.Unmarshal(eBytes, chaincodeEvent)
+	if err != nil {
+		return nil, err
+	}
+
+	return chaincodeEvent, nil
+}
+
 // GetProposalResponsePayload gets the proposal response payload
 func GetProposalResponsePayload(prpBytes []byte) (*peer.ProposalResponsePayload, error) {
 	prp := &peer.ProposalResponsePayload{}
@@ -433,7 +444,7 @@ func createProposalFromCDS(txid string, chainID string, cds *peer.ChaincodeDeplo
 		ChaincodeSpec: &peer.ChaincodeSpec{
 			Type:        peer.ChaincodeSpec_GOLANG,
 			ChaincodeID: &peer.ChaincodeID{Name: "lccc"},
-			CtorMsg:     &peer.ChaincodeInput{Args: [][]byte{[]byte(propType), []byte(chainID), b}}}}
+			Input:       &peer.ChaincodeInput{Args: [][]byte{[]byte(propType), []byte(chainID), b}}}}
 
 	//...and get the proposal for it
 	return CreateProposalFromCIS(txid, common.HeaderType_ENDORSER_TRANSACTION, chainID, lcccSpec, creator)
