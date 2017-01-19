@@ -2,77 +2,6 @@
 // source: peer/chaincode.proto
 // DO NOT EDIT!
 
-/*
-Package peer is a generated protocol buffer package.
-
-It is generated from these files:
-	peer/chaincode.proto
-	peer/chaincode_proposal.proto
-	peer/chaincode_transaction.proto
-	peer/chaincodeevent.proto
-	peer/configuration.proto
-	peer/events.proto
-	peer/fabric.proto
-	peer/fabric_message.proto
-	peer/fabric_proposal.proto
-	peer/fabric_proposal_response.proto
-	peer/fabric_service.proto
-	peer/fabric_transaction.proto
-	peer/server_admin.proto
-	peer/server_supervise.proto
-
-It has these top-level messages:
-	ChaincodeID
-	ChaincodeInput
-	ChaincodeSpec
-	ChaincodeDeploymentSpec
-	ChaincodeInvocationSpec
-	ChaincodeProposalContext
-	ChaincodeMessage
-	PutStateInfo
-	RangeQueryState
-	RangeQueryStateNext
-	RangeQueryStateClose
-	RangeQueryStateKeyValue
-	RangeQueryStateResponse
-	ChaincodeHeaderExtension
-	ChaincodeProposalPayload
-	ChaincodeAction
-	ChaincodeActionPayload
-	ChaincodeEndorsedAction
-	ChaincodeEvent
-	AnchorPeers
-	AnchorPeer
-	ChaincodeReg
-	Interest
-	Register
-	Rejection
-	Unregister
-	Event
-	PeerAddress
-	PeerID
-	PeerEndpoint
-	PeersMessage
-	PeersAddresses
-	BlockchainInfo
-	Message
-	SignedProposal
-	Proposal
-	ProposalResponse
-	Response
-	ProposalResponsePayload
-	Endorsement
-	SignedTransaction
-	InvalidTransaction
-	Transaction
-	TransactionAction
-	ServerStatus
-	LogLevelRequest
-	LogLevelResponse
-	PeerReply
-	ConnectPeer
-	PeerInfo
-*/
 package peer
 
 import proto "github.com/golang/protobuf/proto"
@@ -89,12 +18,6 @@ import (
 var _ = proto.Marshal
 var _ = fmt.Errorf
 var _ = math.Inf
-
-// This is a compile-time assertion to ensure that this generated file
-// is compatible with the proto package it is being compiled against.
-// A compilation error at this line likely means your copy of the
-// proto package needs to be updated.
-const _ = proto.ProtoPackageIsVersion2 // please upgrade the proto package
 
 // Confidentiality Levels
 type ConfidentialityLevel int32

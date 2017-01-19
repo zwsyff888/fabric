@@ -4,7 +4,7 @@ option go_package = "github.com/hyperledger/fabric/protos/peer";
 
 package protos;
 
-import "peer/fabric.proto";
+import "peer/peer.proto";
 import "google/protobuf/empty.proto";
 
 // The greeting service definition.
