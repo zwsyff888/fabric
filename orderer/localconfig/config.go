@@ -44,10 +44,22 @@ type General struct {
 	MaxWindowSize uint32
 	ListenAddress string
 	ListenPort    uint16
+	TLS           TLS
 	GenesisMethod string
 	GenesisFile   string
 	Profile       Profile
 	LogLevel      string
+	LocalMSPDir   string
+}
+
+//TLS contains config used to configure TLS for the grpc server
+type TLS struct {
+	Enabled           bool
+	ServerKey         string
+	ServerCertificate string
+	ServerRootCAs     []string
+	ClientAuthEnabled bool
+	ClientRootCAs     []string
 }
 
 // Genesis contains config which is used by the provisional bootstrapper
@@ -121,7 +133,8 @@ var defaults = TopLevel{
 			Enabled: false,
 			Address: "0.0.0.0:6060",
 		},
-		LogLevel: "INFO",
+		LogLevel:    "INFO",
+		LocalMSPDir: "../msp/sampleconfig/",
 	},
 	RAMLedger: RAMLedger{
 		HistorySize: 10000,
@@ -180,6 +193,12 @@ func (c *TopLevel) completeInitialization() {
 		case c.General.Profile.Enabled && (c.General.Profile.Address == ""):
 			logger.Infof("Profiling enabled and General.Profile.Address unset, setting to %s", defaults.General.Profile.Address)
 			c.General.Profile.Address = defaults.General.Profile.Address
+		case c.General.LocalMSPDir == "":
+			logger.Infof("General.LocalMSPDir unset, setting to %s", defaults.General.LocalMSPDir)
+			// Note, this is a bit of a weird one, the orderer may set the ORDERER_CFG_PATH after
+			// the file is initialized, so we cannot initialize this in the structure, so we
+			// deference the env portion here
+			c.General.LocalMSPDir = filepath.Join(os.Getenv("ORDERER_CFG_PATH"), defaults.General.LocalMSPDir)
 		case c.FileLedger.Prefix == "":
 			logger.Infof("FileLedger.Prefix unset, setting to %s", defaults.FileLedger.Prefix)
 			c.FileLedger.Prefix = defaults.FileLedger.Prefix
@@ -221,22 +240,26 @@ func Load() *TopLevel {
 	config := viper.New()
 
 	config.SetConfigName("orderer")
-	alternativeCfgPath := os.Getenv("ORDERER_CFG_PATH")
-	if alternativeCfgPath != "" {
-		logger.Infof("User defined config file path: %s", alternativeCfgPath)
-		config.AddConfigPath(alternativeCfgPath) // Path to look for the config file in
-	} else {
-		config.AddConfigPath("./")
-		config.AddConfigPath("../../.")
-		config.AddConfigPath("../orderer/")
-		config.AddConfigPath("../../orderer/")
+	cfgPath := os.Getenv("ORDERER_CFG_PATH")
+	if cfgPath == "" {
+		logger.Infof("No orderer cfg path set, assuming development environment, deriving from go path")
 		// Path to look for the config file in based on GOPATH
 		gopath := os.Getenv("GOPATH")
 		for _, p := range filepath.SplitList(gopath) {
 			ordererPath := filepath.Join(p, "src/github.com/hyperledger/fabric/orderer/")
-			config.AddConfigPath(ordererPath)
+			if _, err := os.Stat(filepath.Join(ordererPath, "orderer.yaml")); err != nil {
+				// The yaml file does not exist in this component of the go src
+				continue
+			}
+			cfgPath = ordererPath
 		}
+		if cfgPath == "" {
+			logger.Fatalf("Could not find orderer.yaml, try setting ORDERER_CFG_PATH or GOPATH correctly")
+		}
+		logger.Infof("Setting ORDERER_CFG_PATH to: %s", cfgPath)
+		os.Setenv("ORDERER_CFG_PATH", cfgPath)
 	}
+	config.AddConfigPath(cfgPath) // Path to look for the config file in
 
 	// for environment variables
 	config.SetEnvPrefix(Prefix)

@@ -14,28 +14,21 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package provisional
+package cauthdsl
 
 import (
 	cb "github.com/hyperledger/fabric/protos/common"
+	"github.com/hyperledger/fabric/protos/utils"
 )
 
-func (cbs *commonBootstrapper) makeOrdererSystemChainConfig() []*cb.ConfigurationItem {
-	return []*cb.ConfigurationItem{cbs.encodeChainCreators()}
-}
-
-func (cbs *commonBootstrapper) TemplateItems() []*cb.ConfigurationItem {
-	return []*cb.ConfigurationItem{
-		cbs.encodeConsensusType(),
-		cbs.encodeBatchSize(),
-		cbs.encodeBatchTimeout(),
-		cbs.encodeAcceptAllPolicy(),
-		cbs.encodeIngressPolicy(),
-		cbs.encodeEgressPolicy(),
-		cbs.lockDefaultModificationPolicy(),
+// TemplatePolicy creates a headerless configuration item representing a policy for a given key
+func TemplatePolicy(key string, sigPolicyEnv *cb.SignaturePolicyEnvelope) *cb.ConfigurationItem {
+	return &cb.ConfigurationItem{
+		Type: cb.ConfigurationItem_Policy,
+		Key:  key,
+		Value: utils.MarshalOrPanic(&cb.Policy{
+			Type:   int32(cb.Policy_SIGNATURE),
+			Policy: utils.MarshalOrPanic(sigPolicyEnv),
+		}),
 	}
-}
-
-func (kbs *kafkaBootstrapper) TemplateItems() []*cb.ConfigurationItem {
-	return append(kbs.commonBootstrapper.TemplateItems(), kbs.encodeKafkaBrokers())
 }

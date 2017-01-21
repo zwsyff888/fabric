@@ -23,8 +23,11 @@ import (
 	"github.com/hyperledger/fabric/core/crypto/primitives"
 	cb "github.com/hyperledger/fabric/protos/common"
 
+	"errors"
+
 	"github.com/golang/protobuf/proto"
 	"github.com/golang/protobuf/ptypes/timestamp"
+	"github.com/hyperledger/fabric/common/crypto"
 )
 
 // MarshalOrPanic serializes a protobuf message and panics if this operation fails.
@@ -172,4 +175,30 @@ func MakePayloadHeader(ch *cb.ChainHeader, sh *cb.SignatureHeader) *cb.Header {
 		ChainHeader:     ch,
 		SignatureHeader: sh,
 	}
+}
+
+// NewSignatureHeaderOrPanic returns a signature header and panics on error.
+func NewSignatureHeaderOrPanic(signer crypto.LocalSigner) *cb.SignatureHeader {
+	if signer == nil {
+		panic(errors.New("Invalid signer. Must be different from nil."))
+	}
+
+	signatureHeader, err := signer.NewSignatureHeader()
+	if err != nil {
+		panic(fmt.Errorf("Failed generating a new SignatureHeader [%s]", err))
+	}
+	return signatureHeader
+}
+
+// SignOrPanic signs a message and panics on error.
+func SignOrPanic(signer crypto.LocalSigner, msg []byte) []byte {
+	if signer == nil {
+		panic(errors.New("Invalid signer. Must be different from nil."))
+	}
+
+	sigma, err := signer.Sign(msg)
+	if err != nil {
+		panic(fmt.Errorf("Failed generting signature [%s]", err))
+	}
+	return sigma
 }

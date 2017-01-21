@@ -65,9 +65,10 @@ func acceptData(m interface{}) bool {
 type joinChanMsg struct {
 }
 
-// GetTimestamp returns the timestamp of the message's creation
-func (*joinChanMsg) GetTimestamp() time.Time {
-	return time.Now()
+// SequenceNumber returns the sequence number of the block this joinChanMsg
+// is derived from
+func (*joinChanMsg) SequenceNumber() uint64 {
+	return uint64(time.Now().UnixNano())
 }
 
 // AnchorPeers returns all the anchor peers that are in the channel
@@ -766,7 +767,7 @@ var testingg = func(g goroutine) bool {
 	return strings.Index(g.stack[len(g.stack)-1], "testing.go") != -1
 }
 
-func anyOfPredicates(predicates ... goroutinePredicate) goroutinePredicate {
+func anyOfPredicates(predicates ...goroutinePredicate) goroutinePredicate {
 	return func(g goroutine) bool {
 		for _, pred := range predicates {
 			if pred(g) {
@@ -778,7 +779,7 @@ func anyOfPredicates(predicates ... goroutinePredicate) goroutinePredicate {
 }
 
 func shouldNotBeRunningAtEnd(gr goroutine) bool {
-	return ! anyOfPredicates(runTests, goExit, testingg, waitForTestCompl, gossipTest, clientConn, connectionLeak)(gr)
+	return !anyOfPredicates(runTests, goExit, testingg, waitForTestCompl, gossipTest, clientConn, connectionLeak)(gr)
 }
 
 func ensureGoroutineExit(t *testing.T) {

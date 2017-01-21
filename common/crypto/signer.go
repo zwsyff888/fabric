@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-		 http://www.apache.org/licenses/LICENSE-2.0
+                 http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -14,14 +14,15 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package history
+package crypto
 
-import "github.com/hyperledger/fabric/protos/common"
-import "github.com/hyperledger/fabric/core/ledger"
+import cb "github.com/hyperledger/fabric/protos/common"
 
-// HistMgr - an interface that a history manager should implement
-type HistMgr interface {
-	NewHistoryQueryExecutor() (ledger.HistoryQueryExecutor, error)
-	Commit(block *common.Block) error
-	GetBlockNumFromSavepoint() (uint64, error)
+// LocalSigner is a temporary stub interface which will be implemented by the local MSP
+type LocalSigner interface {
+	// NewSignatureHeader creates a SignatureHeader with the correct signing identity and a valid nonce
+	NewSignatureHeader() (*cb.SignatureHeader, error)
+
+	// Sign a message which should embed a signature header created by NewSignatureHeader
+	Sign(message []byte) ([]byte, error)
 }

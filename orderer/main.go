@@ -26,6 +26,7 @@ import (
 	"os"
 
 	"github.com/hyperledger/fabric/common/flogging"
+	"github.com/hyperledger/fabric/core/comm"
 	"github.com/hyperledger/fabric/orderer/common/bootstrap/file"
 	"github.com/hyperledger/fabric/orderer/common/bootstrap/provisional"
 	"github.com/hyperledger/fabric/orderer/kafka"
@@ -40,13 +41,16 @@ import (
 	"github.com/hyperledger/fabric/protos/utils"
 
 	"github.com/Shopify/sarama"
+	"github.com/hyperledger/fabric/common/localmsp"
+	"github.com/hyperledger/fabric/core/peer/msp"
 	logging "github.com/op/go-logging"
-	"google.golang.org/grpc"
 )
 
 var logger = logging.MustGetLogger("orderer/main")
 
 func main() {
+	// Temporarilly set logging level until config is read
+	logging.SetLevel(logging.INFO, "")
 	conf := config.Load()
 	flogging.InitFromSpec(conf.General.LogLevel)
 
@@ -59,12 +63,26 @@ func main() {
 		}()
 	}
 
-	grpcServer := grpc.NewServer()
-
 	lis, err := net.Listen("tcp", fmt.Sprintf("%s:%d", conf.General.ListenAddress, conf.General.ListenPort))
 	if err != nil {
 		fmt.Println("Failed to listen:", err)
 		return
+	}
+
+	//Create GRPC server - return if an error occurs
+	secureConfig := comm.SecureServerConfig{
+		UseTLS: conf.General.TLS.Enabled,
+	}
+	grpcServer, err := comm.NewGRPCServerFromListener(lis, secureConfig)
+	if err != nil {
+		fmt.Println("Failed to return new GRPC server: ", err)
+		return
+	}
+
+	// Load local MSP
+	err = mspmgmt.LoadLocalMsp(conf.General.LocalMSPDir)
+	if err != nil { // Handle errors reading the config file
+		panic(fmt.Errorf("Failed initializing crypto [%s]", err))
 	}
 
 	var lf ordererledger.Factory
@@ -127,7 +145,7 @@ func main() {
 	consenters["solo"] = solo.New()
 	consenters["kafka"] = kafka.New(conf.Kafka.Version, conf.Kafka.Retry)
 
-	manager := multichain.NewManagerImpl(lf, consenters)
+	manager := multichain.NewManagerImpl(lf, consenters, localmsp.NewSigner())
 
 	server := NewServer(
 		manager,
@@ -135,6 +153,7 @@ func main() {
 		int(conf.General.MaxWindowSize),
 	)
 
-	ab.RegisterAtomicBroadcastServer(grpcServer, server)
-	grpcServer.Serve(lis)
+	ab.RegisterAtomicBroadcastServer(grpcServer.Server(), server)
+	logger.Infof("Beginning to serve requests")
+	grpcServer.Start()
 }

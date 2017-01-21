@@ -15,6 +15,7 @@ import (
 
 var logger = logging.MustGetLogger("client")
 var c pb.SuperviseClient
+var Count = 1
 
 func startConn() {
 	var opts []grpc.DialOption
