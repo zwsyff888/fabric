@@ -322,7 +322,7 @@ security:
 #
 ###############################################################################
 
-supervice:
-    enabled: true
+supervise:
+    enabled: false
 
     address: 127.0.0.1:6060

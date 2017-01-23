@@ -15,14 +15,13 @@ import (
 
 var logger = logging.MustGetLogger("client")
 var c pb.SuperviseClient
-var Count = 1
 
 func startConn() {
 	var opts []grpc.DialOption
 	opts = append(opts, grpc.WithInsecure())
 	opts = append(opts, grpc.WithTimeout(3*time.Second))
 	opts = append(opts, grpc.WithBlock())
-	conn, err := grpc.Dial(viper.GetString("supervice.address"), opts...)
+	conn, err := grpc.Dial(viper.GetString("supervise.address"), opts...)
 	if err != nil {
 		logger.Infof(" did not connect: %v", err)
 		return
@@ -55,7 +54,6 @@ func StartSuperviseClient() {
 		if err != nil {
 			//err = fmt.Errorf("Failed to get Height: %s", err)
 			logger.Infof("Failed to get Ledger Height: %s", err)
-		} else {
 			ledgerHeight = 0
 		}
 
