@@ -67,12 +67,15 @@ func StartSuperviseClient() {
 	for _, v := range peers {
 		connpeers = append(connpeers, &pb.ConnectPeer{Endpoint: v.Endpoint, Metadata: v.Metadata, PKIid: v.PKIid})
 	}
-	r, err := c.GetPeer(context.Background(), &pb.PeerInfo{PeerHeight: ledgerHeight, PeerEndpoint: peerEndpoint, ConnectPeers: connpeers})
-	if err != nil {
-		logger.Infof("could not greet: %v", err)
-		return
+	if c != nil {
+		r, err := c.GetPeer(context.Background(), &pb.PeerInfo{PeerHeight: ledgerHeight, PeerEndpoint: peerEndpoint, ConnectPeers: connpeers})
+		if err != nil {
+			logger.Infof("could not greet: %v", err)
+			return
+		}
+		logger.Infof("Greeting: %s", r.Message)
 	}
-	logger.Infof("Greeting: %s", r.Message)
+
 }
 
 // RunClient 1s
