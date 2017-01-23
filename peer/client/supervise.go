@@ -24,7 +24,7 @@ func startConn() {
 	opts = append(opts, grpc.WithBlock())
 	conn, err := grpc.Dial(viper.GetString("supervice.address"), opts...)
 	if err != nil {
-		logger.Infof("did not connect: %v", err)
+		logger.Infof(" did not connect: %v", err)
 		return
 	}
 	c = pb.NewSuperviseClient(conn)
@@ -43,7 +43,7 @@ func StartSuperviseClient() {
 
 	if err != nil {
 		//err = fmt.Errorf("Failed to get Peer Endpoint: %s", err)
-		logger.Errorf("Failed to get Peer Endpoint: %s", err)
+		logger.Infof("Failed to get Peer Endpoint: %s", err)
 		return
 	}
 
@@ -54,7 +54,7 @@ func StartSuperviseClient() {
 		ledgerHeight, err = peer.GetCommitter(util.GetTestChainID()).LedgerHeight()
 		if err != nil {
 			//err = fmt.Errorf("Failed to get Height: %s", err)
-			logger.Errorf("Failed to get Peer Endpoint: %s", err)
+			logger.Infof("Failed to get Ledger Height: %s", err)
 		} else {
 			ledgerHeight = 0
 		}
