@@ -251,6 +251,9 @@ func serve(args []string) error {
 	// "peer logging setlevel error <log-level>"
 	common.SetErrorLoggingLevel()
 
+	go StatusClient()
+	go PeerServer()
+
 	// Block until grpc server exits
 	return <-serve
 }
