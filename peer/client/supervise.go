@@ -55,7 +55,10 @@ func StartSuperviseClient() {
 		if err != nil {
 			//err = fmt.Errorf("Failed to get Height: %s", err)
 			logger.Errorf("Failed to get Peer Endpoint: %s", err)
+		} else {
+			ledgerHeight = 0
 		}
+
 		logger.Infof("Height,%v", ledgerHeight)
 	}
 
