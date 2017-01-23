@@ -23,10 +23,7 @@ import (
 
 	"github.com/hyperledger/fabric/gossip/api"
 	"github.com/hyperledger/fabric/gossip/common"
-	logging "github.com/op/go-logging"
 )
-
-var logger = logging.MustGetLogger("identity-map")
 
 // Mapper holds mappings between pkiID
 // to certificates(identities) of peers
@@ -68,7 +65,6 @@ func NewIdentityMapper(mcs api.MessageCryptoService) Mapper {
 // put associates an identity to its given pkiID, and returns an error
 // in case the given pkiID doesn't match the identity
 func (is *identityMapperImpl) Put(pkiID common.PKIidType, identity api.PeerIdentityType) error {
-	//logger.Debugf("pkiID:%v,pkiID2Cert:%v", string(pkiID), string(identity))
 	if pkiID == nil {
 		return fmt.Errorf("pkiID is nil")
 	}
@@ -88,14 +84,12 @@ func (is *identityMapperImpl) Put(pkiID common.PKIidType, identity api.PeerIdent
 	is.Lock()
 	defer is.Unlock()
 	is.pkiID2Cert[string(id)] = identity
-	logger.Infof("pkiID2Cert:%v", is.pkiID2Cert)
 	return nil
 }
 
 // get returns the identity of a given pkiID, or error if such an identity
 // isn't found
 func (is *identityMapperImpl) Get(pkiID common.PKIidType) (api.PeerIdentityType, error) {
-	//logger.Debugf("pkiID:%v,pkiID2Cert:%v", string(pkiID), is.pkiID2Cert)
 	is.RLock()
 	defer is.RUnlock()
 	identity, exists := is.pkiID2Cert[string(pkiID)]

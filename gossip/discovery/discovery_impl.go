@@ -129,7 +129,6 @@ func NewDiscoveryService(bootstrapPeers []string, self NetworkMember, comm CommS
 	d.connect2BootstrapPeers(bootstrapPeers)
 
 	d.logger.Info("Started", self, "incTime is", d.incTime)
-	d.logger.Debug("Started", self, "incTime is", d.incTime)
 
 	return d
 }

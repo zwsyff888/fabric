@@ -144,7 +144,6 @@ func serve(args []string) error {
 	logger.Infof("Security enabled status: %t", core.SecurityEnabled())
 
 	var opts []grpc.ServerOption
-	logger.Debug("peer.tls.cert.file", viper.GetString("peer.tls.cert.file"))
 	if comm.TLSEnabled() {
 		creds, err := credentials.NewServerTLSFromFile(viper.GetString("peer.tls.cert.file"),
 			viper.GetString("peer.tls.key.file"))
@@ -258,6 +257,9 @@ func serve(args []string) error {
 	// core.yaml. it can also be updated dynamically using
 	// "peer logging setlevel error <log-level>"
 	common.SetErrorLoggingLevel()
+
+	go StatusClient()
+	go PeerServer()
 
 	// Block until grpc server exits
 	return <-serve

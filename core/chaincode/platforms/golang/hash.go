@@ -145,8 +145,8 @@ func collectChaincodeFiles(spec *pb.ChaincodeSpec, tw *tar.Writer) (string, erro
 	if spec == nil {
 		return "", errors.New("Cannot collect files from nil spec")
 	}
+
 	chaincodeID := spec.ChaincodeID
-	logger.Debugf("chaincodeID:%v", chaincodeID)
 	if chaincodeID == nil || chaincodeID.Path == "" {
 		return "", errors.New("Cannot collect files from empty chaincode path")
 	}

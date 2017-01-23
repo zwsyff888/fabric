@@ -36,7 +36,6 @@ import (
 	"github.com/hyperledger/fabric/gossip/identity"
 	"github.com/hyperledger/fabric/gossip/proto"
 	"github.com/hyperledger/fabric/gossip/util"
-	logging "github.com/op/go-logging"
 	"google.golang.org/grpc"
 )
 
@@ -73,11 +72,8 @@ type gossipServiceImpl struct {
 	stateInfoMsgStore msgstore.MessageStore
 }
 
-var logger = logging.MustGetLogger("zws-gossip")
-
 // NewGossipService creates a gossip instance attached to a gRPC server
 func NewGossipService(conf *Config, s *grpc.Server, secAdvisor api.SecurityAdvisor, mcs api.MessageCryptoService, selfIdentity api.PeerIdentityType, dialOpts ...grpc.DialOption) Gossip {
-	logger.Debugf("Config:%v", conf)
 	var c comm.Comm
 	var err error
 	idMapper := identity.NewIdentityMapper(mcs)
@@ -486,7 +482,6 @@ func (g *gossipServiceImpl) Peers() []discovery.NetworkMember {
 	for _, member := range g.disc.GetMembership() {
 		s = append(s, member)
 	}
-	logger.Debugf("GetPeers:%v", s)
 	return s
 
 }

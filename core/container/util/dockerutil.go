@@ -20,8 +20,6 @@ import (
 	"runtime"
 	"strings"
 
-	"fmt"
-
 	"github.com/fsouza/go-dockerclient"
 	"github.com/hyperledger/fabric/common/metadata"
 	"github.com/spf13/viper"
@@ -66,6 +64,5 @@ func parseDockerfileTemplate(template string) string {
 }
 
 func GetDockerfileFromConfig(path string) string {
-	fmt.Printf("viper.GetString(path):%v", viper.GetString(path))
 	return parseDockerfileTemplate(viper.GetString(path))
 }

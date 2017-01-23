@@ -31,13 +31,13 @@ func TestNewGossipCryptoService(t *testing.T) {
 	s2 := grpc.NewServer()
 	s3 := grpc.NewServer()
 
-	ll1, _ := net.Listen("tcp", fmt.Sprintf("%s:%d", "", 3611))
-	ll2, _ := net.Listen("tcp", fmt.Sprintf("%s:%d", "", 3612))
-	ll3, _ := net.Listen("tcp", fmt.Sprintf("%s:%d", "", 3613))
+	ll1, _ := net.Listen("tcp", fmt.Sprintf("%s:%d", "", 5611))
+	ll2, _ := net.Listen("tcp", fmt.Sprintf("%s:%d", "", 5612))
+	ll3, _ := net.Listen("tcp", fmt.Sprintf("%s:%d", "", 5613))
 
-	endpoint1 := "localhost:3611"
-	endpoint2 := "localhost:3612"
-	endpoint3 := "localhost:3613"
+	endpoint1 := "localhost:5611"
+	endpoint2 := "localhost:5612"
+	endpoint3 := "localhost:5613"
 
 	g1 := NewGossipComponent(endpoint1, s1, []grpc.DialOption{grpc.WithInsecure()})
 	g2 := NewGossipComponent(endpoint2, s2, []grpc.DialOption{grpc.WithInsecure()}, endpoint1)

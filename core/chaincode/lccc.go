@@ -205,7 +205,7 @@ func (lccc *LifeCycleSysCC) putChaincodeData(stub shim.ChaincodeStubInterface, c
 	}
 
 	err = stub.PutState(ccname, cdbytes)
-	//logger.Debugf("LCCC putChaincodeData error:%v", err)
+
 	return cd, err
 }
 
@@ -352,7 +352,7 @@ func (lccc *LifeCycleSysCC) executeDeploy(stub shim.ChaincodeStubInterface, chai
 		 **/
 
 	_, err = lccc.createChaincode(stub, chainname, cds.ChaincodeSpec.ChaincodeID.Name, code)
-	logger.Debugf("LCCC executeDeploy ccname:%v", cds.ChaincodeSpec.ChaincodeID.Name)
+
 	return err
 }
 
@@ -421,7 +421,6 @@ func (lccc *LifeCycleSysCC) Invoke(stub shim.ChaincodeStubInterface) ([]byte, er
 	if len(args) < 1 {
 		return nil, InvalidArgsLenErr(len(args))
 	}
-	logger.Debugf("LCCC:%v", string(args[0]))
 
 	function := string(args[0])
 
@@ -441,7 +440,6 @@ func (lccc *LifeCycleSysCC) Invoke(stub shim.ChaincodeStubInterface) ([]byte, er
 
 		//bytes corresponding to deployment spec
 		code := args[2]
-		logger.Debugf("LCCC:chainname:%v", chainname)
 
 		err := lccc.executeDeploy(stub, chainname, code)
 
@@ -469,7 +467,7 @@ func (lccc *LifeCycleSysCC) Invoke(stub shim.ChaincodeStubInterface) ([]byte, er
 
 		cd, cdbytes, _ := lccc.getChaincode(stub, chain, ccname)
 		if cd == nil || cdbytes == nil {
-			logger.Debugf("ChaincodeID [%s/%s] does not exist", chain, ccname)
+			logger.Debug("ChaincodeID [%s/%s] does not exist", chain, ccname)
 			return nil, TXNotFoundErr(ccname + "/" + chain)
 		}
 
