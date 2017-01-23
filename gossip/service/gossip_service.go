@@ -85,6 +85,7 @@ func GetGossipService() GossipService {
 
 // JoinChannel joins the channel and initialize gossip state with given committer
 func (g *gossipServiceImpl) JoinChannel(commiter committer.Committer, block *common.Block) error {
+	logger.Infof("JoinChannel Block %v", block)
 	joinChannelMessage, err := JoinChannelMessageFromBlock(block)
 	if err != nil {
 		logger.Error("Failed creating join channel message:", err)
