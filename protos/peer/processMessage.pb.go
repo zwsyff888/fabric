@@ -7,7 +7,7 @@ package peer
 import proto "github.com/golang/protobuf/proto"
 import fmt "fmt"
 import math "math"
-import google_protobuf1 "github.com/golang/protobuf/ptypes/timestamp"
+import google_protobuf "github.com/golang/protobuf/ptypes/timestamp"
 
 import (
 	context "golang.org/x/net/context"
@@ -26,7 +26,7 @@ type QueryBlocks struct {
 func (m *QueryBlocks) Reset()                    { *m = QueryBlocks{} }
 func (m *QueryBlocks) String() string            { return proto.CompactTextString(m) }
 func (*QueryBlocks) ProtoMessage()               {}
-func (*QueryBlocks) Descriptor() ([]byte, []int) { return fileDescriptor6, []int{0} }
+func (*QueryBlocks) Descriptor() ([]byte, []int) { return fileDescriptor12, []int{0} }
 
 type MessageInput struct {
 	PeerIp   string    `protobuf:"bytes,1,opt,name=PeerIp" json:"PeerIp,omitempty"`
@@ -38,7 +38,7 @@ type MessageInput struct {
 func (m *MessageInput) Reset()                    { *m = MessageInput{} }
 func (m *MessageInput) String() string            { return proto.CompactTextString(m) }
 func (*MessageInput) ProtoMessage()               {}
-func (*MessageInput) Descriptor() ([]byte, []int) { return fileDescriptor6, []int{1} }
+func (*MessageInput) Descriptor() ([]byte, []int) { return fileDescriptor12, []int{1} }
 
 func (m *MessageInput) GetMblocks() []*Mblock {
 	if m != nil {
@@ -56,7 +56,7 @@ type Mblock struct {
 func (m *Mblock) Reset()                    { *m = Mblock{} }
 func (m *Mblock) String() string            { return proto.CompactTextString(m) }
 func (*Mblock) ProtoMessage()               {}
-func (*Mblock) Descriptor() ([]byte, []int) { return fileDescriptor6, []int{2} }
+func (*Mblock) Descriptor() ([]byte, []int) { return fileDescriptor12, []int{2} }
 
 func (m *Mblock) GetHeader() *MblockHeader {
 	if m != nil {
@@ -89,7 +89,7 @@ type MblockHeader struct {
 func (m *MblockHeader) Reset()                    { *m = MblockHeader{} }
 func (m *MblockHeader) String() string            { return proto.CompactTextString(m) }
 func (*MblockHeader) ProtoMessage()               {}
-func (*MblockHeader) Descriptor() ([]byte, []int) { return fileDescriptor6, []int{3} }
+func (*MblockHeader) Descriptor() ([]byte, []int) { return fileDescriptor12, []int{3} }
 
 type MblockData struct {
 	Datas []*TransData `protobuf:"bytes,1,rep,name=Datas" json:"Datas,omitempty"`
@@ -98,7 +98,7 @@ type MblockData struct {
 func (m *MblockData) Reset()                    { *m = MblockData{} }
 func (m *MblockData) String() string            { return proto.CompactTextString(m) }
 func (*MblockData) ProtoMessage()               {}
-func (*MblockData) Descriptor() ([]byte, []int) { return fileDescriptor6, []int{4} }
+func (*MblockData) Descriptor() ([]byte, []int) { return fileDescriptor12, []int{4} }
 
 func (m *MblockData) GetDatas() []*TransData {
 	if m != nil {
@@ -108,17 +108,17 @@ func (m *MblockData) GetDatas() []*TransData {
 }
 
 type TransData struct {
-	Txid    string                      `protobuf:"bytes,1,opt,name=Txid" json:"Txid,omitempty"`
-	ChainID string                      `protobuf:"bytes,2,opt,name=ChainID" json:"ChainID,omitempty"`
-	Time    *google_protobuf1.Timestamp `protobuf:"bytes,3,opt,name=Time" json:"Time,omitempty"`
+	Txid    string                     `protobuf:"bytes,1,opt,name=Txid" json:"Txid,omitempty"`
+	ChainID string                     `protobuf:"bytes,2,opt,name=ChainID" json:"ChainID,omitempty"`
+	Time    *google_protobuf.Timestamp `protobuf:"bytes,3,opt,name=Time" json:"Time,omitempty"`
 }
 
 func (m *TransData) Reset()                    { *m = TransData{} }
 func (m *TransData) String() string            { return proto.CompactTextString(m) }
 func (*TransData) ProtoMessage()               {}
-func (*TransData) Descriptor() ([]byte, []int) { return fileDescriptor6, []int{5} }
+func (*TransData) Descriptor() ([]byte, []int) { return fileDescriptor12, []int{5} }
 
-func (m *TransData) GetTime() *google_protobuf1.Timestamp {
+func (m *TransData) GetTime() *google_protobuf.Timestamp {
 	if m != nil {
 		return m.Time
 	}
@@ -132,7 +132,7 @@ type MblockMetadata struct {
 func (m *MblockMetadata) Reset()                    { *m = MblockMetadata{} }
 func (m *MblockMetadata) String() string            { return proto.CompactTextString(m) }
 func (*MblockMetadata) ProtoMessage()               {}
-func (*MblockMetadata) Descriptor() ([]byte, []int) { return fileDescriptor6, []int{6} }
+func (*MblockMetadata) Descriptor() ([]byte, []int) { return fileDescriptor12, []int{6} }
 
 type MessageOutput struct {
 	Output string `protobuf:"bytes,1,opt,name=output" json:"output,omitempty"`
@@ -141,7 +141,7 @@ type MessageOutput struct {
 func (m *MessageOutput) Reset()                    { *m = MessageOutput{} }
 func (m *MessageOutput) String() string            { return proto.CompactTextString(m) }
 func (*MessageOutput) ProtoMessage()               {}
-func (*MessageOutput) Descriptor() ([]byte, []int) { return fileDescriptor6, []int{7} }
+func (*MessageOutput) Descriptor() ([]byte, []int) { return fileDescriptor12, []int{7} }
 
 func init() {
 	proto.RegisterType((*QueryBlocks)(nil), "protos.QueryBlocks")
@@ -223,7 +223,7 @@ var _StatusPeer_serviceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: fileDescriptor6,
+	Metadata: fileDescriptor12,
 }
 
 // Client API for QueryPeer service
@@ -287,12 +287,12 @@ var _QueryPeer_serviceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: fileDescriptor6,
+	Metadata: fileDescriptor12,
 }
 
-func init() { proto.RegisterFile("peer/processMessage.proto", fileDescriptor6) }
+func init() { proto.RegisterFile("peer/processMessage.proto", fileDescriptor12) }
 
-var fileDescriptor6 = []byte{
+var fileDescriptor12 = []byte{
 	// 511 bytes of a gzipped FileDescriptorProto
 	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x09, 0x6e, 0x88, 0x02, 0xff, 0x5c, 0x53, 0x41, 0x6f, 0xd3, 0x30,
 	0x14, 0x5e, 0x59, 0xe8, 0xd6, 0xd7, 0x52, 0x09, 0x03, 0x53, 0xe8, 0x01, 0x26, 0x1f, 0x58, 0x11,

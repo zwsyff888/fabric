@@ -4,6 +4,12 @@ import (
 	"encoding/base64"
 	"fmt"
 	// "github.com/golang/protobuf/proto"
+	"log"
+	"net"
+	"os"
+	"strconv"
+	"time"
+
 	"github.com/hyperledger/fabric/common/util"
 	"github.com/hyperledger/fabric/core/peer"
 	"github.com/hyperledger/fabric/protos/common"
@@ -13,11 +19,6 @@ import (
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
-	"log"
-	"net"
-	"os"
-	"strconv"
-	"time"
 )
 
 type server struct{}
@@ -106,7 +107,7 @@ func (s *server) QueryMessage(ctx context.Context, query *pb.QueryBlocks) (*pb.M
 }
 
 func PeerServer() {
-	port := port := viper.GetString("peer.statusPeer.grpcServerPort")//os.Getenv("CORE_PEER_GRPCPORTS")
+	port := viper.GetString("peer.statusPeer.grpcServerPort") //os.Getenv("CORE_PEER_GRPCPORTS")
 	lis, err := net.Listen("tcp", port)
 	// fmt.Println("i am come here!!!")
 	if err != nil {
@@ -127,8 +128,8 @@ func PeerServer() {
 }
 
 func StatusClient() {
-	address := viper.GetString("peer.statusPeer.sendGrpcServer")//os.Getenv("CORE_PEER_GRPCSERVER")
-	strTimeCycle := viper.GetString("peer.statusPeer.sendStatusCycle")//os.Getenv("CORE_PEER_SENDGRPC_TIME")
+	address := viper.GetString("peer.statusPeer.sendGrpcServer")       //os.Getenv("CORE_PEER_GRPCSERVER")
+	strTimeCycle := viper.GetString("peer.statusPeer.sendStatusCycle") //os.Getenv("CORE_PEER_SENDGRPC_TIME")
 	timeCycle, err := strconv.Atoi(strTimeCycle)
 	if err != nil {
 		panic(err)
@@ -163,7 +164,7 @@ func StatusClient() {
 			continue
 		}
 		// log.Printf("Greeting: %s", r.Output)
-		// fmt.Println("@@@@@@ chenqiao: Greeeting: ", r.Output)
+		fmt.Println("@@@@@@ chenqiao: Greeeting: ", r.Output)
 		time.Sleep(time.Duration(timeCycle) * 1e9)
 		conn.Close()
 	}
