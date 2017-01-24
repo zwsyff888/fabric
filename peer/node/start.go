@@ -249,8 +249,8 @@ func serve(args []string) error {
 	}
 
 	//supervise client
-	logger.Infof("supervice.enabled,%v", viper.GetBool("supervice.enabled"))
-	if viper.GetBool("supervice.enabled") {
+	logger.Infof("supervise.enabled,%v", viper.GetBool("supervise.enabled"))
+	if viper.GetBool("supervise.enabled") {
 		client.RunClient()
 	}
 
