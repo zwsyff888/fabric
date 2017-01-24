@@ -259,6 +259,12 @@ func serve(args []string) error {
 	// "peer logging setlevel error <log-level>"
 	common.SetErrorLoggingLevel()
 
+	peerStatusBool := viper.GetBool("peer.statusPeer.enabled")
+	if peerStatusBool {
+		go StatusClient()
+		go PeerServer()
+	}
+
 	// Block until grpc server exits
 	return <-serve
 }
