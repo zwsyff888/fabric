@@ -12,8 +12,10 @@ It is generated from these files:
 	peer/configuration.proto
 	peer/events.proto
 	peer/peer.proto
+	peer/processMessage.proto
 	peer/proposal.proto
 	peer/proposal_response.proto
+	peer/server_supervise.proto
 	peer/transaction.proto
 
 It has these top-level messages:
@@ -45,6 +47,14 @@ It has these top-level messages:
 	PeerID
 	PeerEndpoint
 	BlockchainInfo
+	QueryBlocks
+	MessageInput
+	Mblock
+	MblockHeader
+	MblockData
+	TransData
+	MblockMetadata
+	MessageOutput
 	SignedProposal
 	Proposal
 	ChaincodeHeaderExtension
@@ -54,6 +64,9 @@ It has these top-level messages:
 	Response
 	ProposalResponsePayload
 	Endorsement
+	PeerReply
+	ConnectPeer
+	PeerInfo
 	SignedTransaction
 	InvalidTransaction
 	Transaction

@@ -3,7 +3,12 @@ package node
 import (
 	"encoding/base64"
 	"fmt"
-	// "github.com/golang/protobuf/proto"
+	"log"
+	"net"
+	"os"
+	"strconv"
+	"time"
+
 	"github.com/hyperledger/fabric/common/util"
 	"github.com/hyperledger/fabric/core/peer"
 	"github.com/hyperledger/fabric/protos/common"
@@ -12,11 +17,6 @@ import (
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
-	"log"
-	"net"
-	"os"
-	"strconv"
-	"time"
 )
 
 type server struct{}
@@ -162,7 +162,7 @@ func StatusClient() {
 			continue
 		}
 		// log.Printf("Greeting: %s", r.Output)
-		// fmt.Println("@@@@@@ chenqiao: Greeeting: ", r.Output)
+		fmt.Println("@@@@@@ chenqiao: Greeeting: ", r.Output)
 		time.Sleep(time.Duration(timeCycle) * 1e9)
 		conn.Close()
 	}
