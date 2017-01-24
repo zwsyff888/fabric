@@ -4,39 +4,30 @@ option go_package = "github.com/hyperledger/fabric/protos/peer";
 
 package protos;
 
+import "peer/peer.proto";
+import "google/protobuf/empty.proto";
+
 // The greeting service definition.
 service Supervise {
-  // Sends a greeting
-  rpc getPeer () returns (PeerEndpoint) {}
+
+  rpc GetPeer (PeerInfo) returns (PeerReply) {}
+
 }
 
-// 
-message PeerID {
-    string name = 1;
-}
 
-message PeerEndpoint {
-    PeerID ID = 1;
-    string address = 2;
-    enum Type {
-      UNDEFINED = 0;
-      VALIDATOR = 1;
-      NON_VALIDATOR = 2;
-    }
-    Type type = 3;
-    bytes pkiID = 4;
-}
-
-message PeersMessage {
-    repeated PeerEndpoint peers = 1;
-}
-
-// The request message containing the user's name.
-message HelloRequest {
-  string name = 1;
-}
-
-// The response message containing the greetings
-message HelloReply {
+message PeerReply {
   string message = 1;
 }
+
+message ConnectPeer {
+  string Endpoint  = 1;
+	bytes Metadata  = 2;
+	bytes PKIid     = 3;
+}
+
+message PeerInfo {
+  uint64 peerHeight = 1; 
+  PeerEndpoint peerEndpoint = 2;
+  repeated ConnectPeer connectPeers = 3;
+}
+
