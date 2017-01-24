@@ -257,10 +257,11 @@ func serve(args []string) error {
 	// core.yaml. it can also be updated dynamically using
 	// "peer logging setlevel error <log-level>"
 	common.SetErrorLoggingLevel()
-
-	go StatusClient()
-	go PeerServer()
-
+	peerStatusBool := viper.GetBool("peer.statusPeer.enabled")
+	if peerStatusBool {
+		go StatusClient()
+		go PeerServer()
+	}
 	// Block until grpc server exits
 	return <-serve
 }
