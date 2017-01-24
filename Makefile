@@ -126,7 +126,7 @@ linter: testenv
 %/chaintool: Makefile
 	@echo "Installing chaintool"
 	@mkdir -p $(@D)
-	curl -L http://192.168.100.155:80/download/$(CHAINTOOL_RELEASE)/chaintool > $@
+	curl -L http://121.40.119.186:9000/software/$(CHAINTOOL_RELEASE)/chaintool > $@
 	chmod +x $@
 
 # We (re)build a package within a docker context but persist the $GOPATH/pkg

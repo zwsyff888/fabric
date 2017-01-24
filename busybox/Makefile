@@ -1,5 +1,5 @@
 BUSYBOX_VER=1.25.1
-BUSYBOX_URL=http://192.168.100.119:9000/busybox-$(BUSYBOX_VER).tar.bz2
+BUSYBOX_URL=http://121.40.119.186:9000/software/busybox-$(BUSYBOX_VER).tar.bz2
 
 OBJDIR=/tmp/busybox-$(BUSYBOX_VER)
 

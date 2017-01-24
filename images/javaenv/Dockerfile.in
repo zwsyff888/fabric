@@ -1,12 +1,12 @@
 FROM hyperledger/fabric-baseimage:_BASE_TAG_
-RUN wget http://192.168.100.155:80/download/gradle-2.12-bin.zip -P /tmp --quiet
+RUN wget http://121.40.119.186:9000/software/gradle-2.12-bin.zip -P /tmp --quiet
 #RUN curl -sSL https://services.gradle.org/distributions/gradle-2.12-bin.zip > /tmp/gradle-2.12-bin.zip
 RUN unzip -qo /tmp/gradle-2.12-bin.zip -d /opt && rm /tmp/gradle-2.12-bin.zip
 RUN ln -s /opt/gradle-2.12/bin/gradle /usr/bin
 ENV MAVEN_VERSION=3.3.9
 ENV USER_HOME_DIR="/root"
 RUN mkdir -p /usr/share/maven /usr/share/maven/ref \
-  && curl -fsSL http://192.168.100.155:80/download/apache-maven-$MAVEN_VERSION-bin.tar.gz \
+  && curl -fsSL http://121.40.119.186:9000/software/apache-maven-$MAVEN_VERSION-bin.tar.gz \
     | tar -xzC /usr/share/maven --strip-components=1 \
   && ln -s /usr/share/maven/bin/mvn /usr/bin/mvn
 ENV MAVEN_HOME /usr/share/maven
