@@ -1,4 +1,4 @@
-FROM hyperledger/fabric-runtime:x86_64-0.7.0-snapshot-313d74e
+FROM hyperledger/fabric-runtime:x86_64-0.7.0-snapshot-087c8c3
 ENV ORDERER_CFG_PATH /etc/hyperledger/fabric
 RUN mkdir -p /var/hyperledger/db /etc/hyperledger/fabric
 COPY payload/orderer /usr/local/bin

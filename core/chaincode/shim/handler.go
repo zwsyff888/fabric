@@ -289,6 +289,7 @@ func (handler *Handler) handleTransaction(msg *pb.ChaincodeMessage) {
 		// Create the ChaincodeStub which the chaincode can use to callback
 		stub := new(ChaincodeStub)
 		stub.init(handler, msg.Txid, input, msg.ProposalContext)
+		chaincodeLogger.Infof("ProposalContext,%v", msg.ProposalContext)
 		res, err := handler.cc.Invoke(stub)
 
 		if err != nil {

@@ -68,6 +68,9 @@ func (t *SimpleChaincode) Init(stub shim.ChaincodeStubInterface) ([]byte, error)
 		return nil, err
 	}
 
+	code, _ := stub.GetCallerCertificate()
+	stub.PutState("x", code)
+	stub.PutState("y", []byte("haha"))
 	return nil, nil
 }
 

@@ -439,7 +439,7 @@ func (stub *ChaincodeStub) GetFunctionAndParameters() (function string, params [
 // GetCallerCertificate returns caller certificate
 func (stub *ChaincodeStub) GetCallerCertificate() ([]byte, error) {
 	if stub.proposalContext != nil {
-		return stub.proposalContext.Transient, nil
+		return stub.proposalContext.Creator, nil
 	}
 
 	return nil, errors.New("Creator field not set.")
