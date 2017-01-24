@@ -1,0 +1,7 @@
+FROM hyperledger/fabric-runtime:x86_64-0.7.0-snapshot-313d74e
+ENV ORDERER_CFG_PATH /etc/hyperledger/fabric
+RUN mkdir -p /var/hyperledger/db /etc/hyperledger/fabric
+COPY payload/orderer /usr/local/bin
+COPY payload/orderer.yaml $ORDERER_CFG_PATH
+EXPOSE 7050
+CMD orderer

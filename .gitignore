@@ -1,15 +1,12 @@
 # Local build binaries
 node-cli/node-cli
 *.pyc
-/build/*
-/bin
 .idea
 *.iml
 .DS_Store
 tags
 .tags
 .vagrant/
-/build
 # Emacs backup files
 *~
 *#
@@ -29,5 +26,3 @@ report.xml
 .settings
 .project
 .gradle
-build/
-bin/
