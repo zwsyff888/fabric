@@ -158,7 +158,7 @@ peer:
         listenAddress: 0.0.0.0:6060
 
     statusPeer:
-        enabled:     true
+        enabled:     false
         sendGrpcServer:  192.168.100.252:38254
         sendStatusCycle:    5
         grpcServerPort:  :9898
