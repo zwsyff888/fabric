@@ -103,7 +103,7 @@ func main() {
 	http.Handle("/socket", websocket.Handler(Echo))
 	go func() {
 
-		if err := http.ListenAndServe(":7056", nil); err != nil {
+		if err := http.ListenAndServe(":38252", nil); err != nil {
 			log.Fatal("ListenAndServe:", err)
 		}
 
