@@ -1,4 +1,4 @@
-FROM hyperledger/fabric-runtime:x86_64-0.7.0-snapshot-087c8c3
+FROM hyperledger/fabric-runtime:x86_64-0.7.0-snapshot-00ce328
 ENV PEER_CFG_PATH /etc/hyperledger/fabric
 RUN mkdir -p /var/hyperledger/db $PEER_CFG_PATH
 COPY payload/peer /usr/local/bin
