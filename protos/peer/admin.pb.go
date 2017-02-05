@@ -31,10 +31,11 @@ It has these top-level messages:
 	ChaincodeMessage
 	PutStateInfo
 	RangeQueryState
-	RangeQueryStateNext
-	RangeQueryStateClose
-	RangeQueryStateKeyValue
-	RangeQueryStateResponse
+	ExecuteQueryState
+	QueryStateNext
+	QueryStateClose
+	QueryStateKeyValue
+	QueryStateResponse
 	ChaincodeEvent
 	AnchorPeers
 	AnchorPeer
@@ -46,15 +47,6 @@ It has these top-level messages:
 	Event
 	PeerID
 	PeerEndpoint
-	BlockchainInfo
-	QueryBlocks
-	MessageInput
-	Mblock
-	MblockHeader
-	MblockData
-	TransData
-	MblockMetadata
-	MessageOutput
 	SignedProposal
 	Proposal
 	ChaincodeHeaderExtension

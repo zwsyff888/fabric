@@ -52,12 +52,12 @@ type General struct {
 	LocalMSPDir   string
 }
 
-//TLS contains config used to configure TLS for the grpc server
+//TLS contains config used to configure TLS
 type TLS struct {
 	Enabled           bool
-	ServerKey         string
-	ServerCertificate string
-	ServerRootCAs     []string
+	PrivateKey        string
+	Certificate       string
+	RootCAs           []string
 	ClientAuthEnabled bool
 	ClientRootCAs     []string
 }
@@ -67,6 +67,7 @@ type Genesis struct {
 	OrdererType  string
 	BatchTimeout time.Duration
 	BatchSize    BatchSize
+	SbftShared   SbftShared
 }
 
 // BatchSize contains configuration affecting the size of batches
@@ -99,6 +100,23 @@ type Kafka struct {
 	Retry   Retry
 	Verbose bool
 	Version sarama.KafkaVersion
+	TLS     TLS
+}
+
+// SbftLocal contains config for the SBFT peer/replica
+type SbftLocal struct {
+	PeerCommAddr string
+	CertFile     string
+	KeyFile      string
+	DataDir      string
+}
+
+// SbftShared contains config for the SBFT network
+type SbftShared struct {
+	N                  uint64
+	F                  uint64
+	RequestTimeoutNsec uint64
+	Peers              map[string]string // Address to Cert mapping
 }
 
 // Retry contains config for the reconnection attempts to the Kafka brokers
@@ -118,6 +136,7 @@ type TopLevel struct {
 	FileLedger FileLedger
 	Kafka      Kafka
 	Genesis    Genesis
+	SbftLocal  SbftLocal
 }
 
 var defaults = TopLevel{
@@ -151,6 +170,9 @@ var defaults = TopLevel{
 		},
 		Verbose: false,
 		Version: sarama.V0_9_0_1,
+		TLS: TLS{
+			Enabled: false,
+		},
 	},
 	Genesis: Genesis{
 		OrdererType:  "solo",
@@ -160,6 +182,18 @@ var defaults = TopLevel{
 			AbsoluteMaxBytes:  100000000,
 			PreferredMaxBytes: 512 * 1024,
 		},
+		SbftShared: SbftShared{
+			N:                  1,
+			F:                  0,
+			RequestTimeoutNsec: uint64(time.Second.Nanoseconds()),
+			Peers:              map[string]string{":6101": "sbft/testdata/cert1.pem"},
+		},
+	},
+	SbftLocal: SbftLocal{
+		PeerCommAddr: ":6101",
+		CertFile:     "sbft/testdata/cert1.pem",
+		KeyFile:      "sbft/testdata/key.pem",
+		DataDir:      "/tmp",
 	},
 }
 
@@ -190,6 +224,12 @@ func (c *TopLevel) completeInitialization() {
 			c.General.GenesisMethod = defaults.General.GenesisMethod
 		case c.General.GenesisFile == "":
 			c.General.GenesisFile = defaults.General.GenesisFile
+		case c.Kafka.TLS.Enabled && c.Kafka.TLS.Certificate == "":
+			logger.Panicf("General.Kafka.TLS.Certificate must be set if General.Kafka.TLS.Enabled is set to true.")
+		case c.Kafka.TLS.Enabled && c.Kafka.TLS.PrivateKey == "":
+			logger.Panicf("General.Kafka.TLS.PrivateKey must be set if General.Kafka.TLS.Enabled is set to true.")
+		case c.Kafka.TLS.Enabled && c.Kafka.TLS.RootCAs == nil:
+			logger.Panicf("General.Kafka.TLS.CertificatePool must be set if General.Kafka.TLS.Enabled is set to true.")
 		case c.General.Profile.Enabled && (c.General.Profile.Address == ""):
 			logger.Infof("Profiling enabled and General.Profile.Address unset, setting to %s", defaults.General.Profile.Address)
 			c.General.Profile.Address = defaults.General.Profile.Address

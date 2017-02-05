@@ -127,6 +127,7 @@ func newChainSupport(
 	if err != nil {
 		logger.Fatalf("Error extracting orderer metadata for chain %x: %s", cs.ChainID(), err)
 	}
+	logger.Debugf("Retrieved metadata for tip of chain (block #%d): %+v", cs.Reader().Height()-1, metadata)
 
 	cs.chain, err = consenter.HandleChain(cs, metadata)
 	if err != nil {
@@ -241,12 +242,10 @@ func (cs *chainSupport) WriteBlock(block *cb.Block, committers []filter.Committe
 	for _, committer := range committers {
 		committer.Commit()
 	}
-
 	// Set the orderer-related metadata field
 	if encodedMetadataValue != nil {
 		block.Metadata.Metadata[cb.BlockMetadataIndex_ORDERER] = utils.MarshalOrPanic(&cb.Metadata{Value: encodedMetadataValue})
 	}
-
 	cs.addBlockSignature(block)
 	cs.addLastConfigSignature(block)
 

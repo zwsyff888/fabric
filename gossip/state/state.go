@@ -112,13 +112,6 @@ func NewGossipStateProvider(chainID string, g gossip.Gossip, committer committer
 		return nil
 	}
 
-	//if the ledger is empty, we need a block from orderer
-	//so don't expect height+1 but expect 0
-	next := height
-	if height > 0 {
-		next = height + 1
-	}
-
 	s := &GossipStateProviderImpl{
 		chainID: chainID,
 
@@ -133,7 +126,7 @@ func NewGossipStateProvider(chainID string, g gossip.Gossip, committer committer
 
 		stopFlag: 0,
 		// Create a queue for payload received
-		payloads: NewPayloadsBuffer(next),
+		payloads: NewPayloadsBuffer(height),
 
 		committer: committer,
 
@@ -142,7 +135,7 @@ func NewGossipStateProvider(chainID string, g gossip.Gossip, committer committer
 
 	logging.SetFormatter(logFormat)
 
-	state := NewNodeMetastate(height)
+	state := NewNodeMetastate(height - 1)
 
 	s.logger.Infof("Updating node metadata information, current ledger sequence is at = %d, next expected block is = %d", state.LedgerHeight, s.payloads.Next())
 	bytes, err := state.Bytes()
@@ -343,13 +336,8 @@ func (s *GossipStateProviderImpl) antiEntropy() {
 			continue
 		}
 
-		if current > 0 {
-			current = current + 1
-		}
-		//s.logger.Debugf("Requesting new blocks in range [%d...%d].", current+1, max)
 		s.requestBlocksInRange(uint64(current), uint64(max))
 	}
-	s.logger.Debug("[XXX]: Stateprovider stopped, stoping anti entropy procedure.")
 	s.done.Done()
 }
 

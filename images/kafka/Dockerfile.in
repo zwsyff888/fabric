@@ -10,9 +10,12 @@ RUN curl -fSL "http://192.168.100.155:80/download/kafka_${SCALA_VERSION}-${KAFKA
     && mv /opt/kafka_"$SCALA_VERSION"-"$KAFKA_VERSION" /opt/kafka \
     && rm kafka_"$SCALA_VERSION"-"$KAFKA_VERSION".tgz
 
+ADD payload/kafka-run-class.sh /opt/kafka/bin/kafka-run-class.sh
+
 ADD payload/docker-entrypoint.sh /docker-entrypoint.sh
 
 EXPOSE 9092
+EXPOSE 9093
 
 ENTRYPOINT ["/docker-entrypoint.sh"]
 CMD ["/opt/kafka/bin/kafka-server-start.sh"]

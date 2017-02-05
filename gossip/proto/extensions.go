@@ -21,6 +21,7 @@ import (
 
 	"fmt"
 
+	"github.com/golang/protobuf/proto"
 	"github.com/hyperledger/fabric/gossip/common"
 	"github.com/hyperledger/fabric/gossip/util"
 )
@@ -58,6 +59,10 @@ func (mc *msgComparator) invalidationPolicy(this interface{}, that interface{}) 
 
 	if thisMsg.IsIdentityMsg() && thatMsg.IsIdentityMsg() {
 		return mc.identityInvalidationPolicy(thisMsg.GetPeerIdentity(), thatMsg.GetPeerIdentity())
+	}
+
+	if thisMsg.IsLeadershipMsg() && thatMsg.IsLeadershipMsg() {
+		return leaderInvalidationPolicy(thisMsg.GetLeadershipMsg(), thatMsg.GetLeadershipMsg())
 	}
 
 	return common.MessageNoAction
@@ -98,6 +103,14 @@ func (mc *msgComparator) dataInvalidationPolicy(thisDataMsg *DataMessage, thatDa
 }
 
 func aliveInvalidationPolicy(thisMsg *AliveMessage, thatMsg *AliveMessage) common.InvalidationResult {
+	if !bytes.Equal(thisMsg.Membership.PkiID, thatMsg.Membership.PkiID) {
+		return common.MessageNoAction
+	}
+
+	return compareTimestamps(thisMsg.Timestamp, thatMsg.Timestamp)
+}
+
+func leaderInvalidationPolicy(thisMsg *LeadershipMessage, thatMsg *LeadershipMessage) common.InvalidationResult {
 	if !bytes.Equal(thisMsg.Membership.PkiID, thatMsg.Membership.PkiID) {
 		return common.MessageNoAction
 	}
@@ -216,6 +229,11 @@ func (m *GossipMessage) IsDigestMsg() bool {
 	return m.GetDataDig() != nil
 }
 
+// IsLeadershipMsg returns whether this GossipMessage is a leadership (leader election) message
+func (m *GossipMessage) IsLeadershipMsg() bool {
+	return m.GetLeadershipMsg() != nil
+}
+
 // MsgConsumer invokes code given a GossipMessage
 type MsgConsumer func(*GossipMessage)
 
@@ -273,5 +291,47 @@ func (m *GossipMessage) IsTagLegal() error {
 		return nil
 	}
 
+	if m.IsLeadershipMsg() {
+		if m.Tag != GossipMessage_CHAN_AND_ORG {
+			return fmt.Errorf("Tag should be %s", GossipMessage_Tag_name[int32(GossipMessage_CHAN_AND_ORG)])
+		}
+		return nil
+	}
+
 	return fmt.Errorf("Unknown message type: %v", m)
+}
+
+type Verifier func(peerIdentity []byte, signature, message []byte) error
+type Signer func(msg []byte) ([]byte, error)
+
+// Sign signs a GossipMessage with given Signer.
+// Returns a signed message on success
+// or an error on failure
+func (m *GossipMessage) Sign(signer Signer) error {
+	m.Signature = nil
+	serializedMsg, err := proto.Marshal(m)
+	if err != nil {
+		return err
+	}
+	sig, err := signer(serializedMsg)
+	if err != nil {
+		return err
+	}
+	m.Signature = sig
+	return nil
+}
+
+// Verify verifies a signed GossipMessage with a given Verifier.
+// Returns nil on success, error on failure.
+func (m *GossipMessage) Verify(peerIdentity []byte, verify Verifier) error {
+	sig := m.Signature
+	defer func() {
+		m.Signature = sig
+	}()
+	m.Signature = nil
+	serializedMsg, err := proto.Marshal(m)
+	if err != nil {
+		return err
+	}
+	return verify(peerIdentity, sig, serializedMsg)
 }

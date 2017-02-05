@@ -32,8 +32,6 @@ func TestMain(m *testing.M) {
 }
 
 func TestCar_BuildImage(t *testing.T) {
-	//Skipping the test till chaintool is fixed for changint CtorMsg to Input
-	t.Skip()
 	vm, err := container.NewVM()
 
 	if err != nil {
@@ -49,7 +47,7 @@ func TestCar_BuildImage(t *testing.T) {
 
 	chaincodePath := cwd + "/org.hyperledger.chaincode.example02-0.1-SNAPSHOT.car"
 	spec := &pb.ChaincodeSpec{Type: pb.ChaincodeSpec_CAR, ChaincodeID: &pb.ChaincodeID{Name: "cartest", Path: chaincodePath}, Input: &pb.ChaincodeInput{Args: util.ToChaincodeArgs("f")}}
-	if _, err := vm.BuildChaincodeContainer(spec); err != nil {
+	if err := vm.BuildChaincodeContainer(spec); err != nil {
 		t.Error(err)
 	}
 }

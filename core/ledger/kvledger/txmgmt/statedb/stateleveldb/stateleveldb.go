@@ -18,12 +18,13 @@ package stateleveldb
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 
+	"github.com/hyperledger/fabric/common/ledger/util/leveldbhelper"
 	"github.com/hyperledger/fabric/core/ledger/kvledger/txmgmt/statedb"
 	"github.com/hyperledger/fabric/core/ledger/kvledger/txmgmt/version"
 	"github.com/hyperledger/fabric/core/ledger/ledgerconfig"
-	"github.com/hyperledger/fabric/core/ledger/util/leveldbhelper"
 	logging "github.com/op/go-logging"
 	"github.com/syndtr/goleveldb/leveldb/iterator"
 )
@@ -90,7 +91,7 @@ func (vdb *versionedDB) GetState(namespace string, key string) (*statedb.Version
 	if dbVal == nil {
 		return nil, nil
 	}
-	val, ver := decodeValue(dbVal)
+	val, ver := statedb.DecodeValue(dbVal)
 	return &statedb.VersionedValue{Value: val, Version: ver}, nil
 }
 
@@ -122,26 +123,30 @@ func (vdb *versionedDB) GetStateRangeScanIterator(namespace string, startKey str
 
 // ExecuteQuery implements method in VersionedDB interface
 func (vdb *versionedDB) ExecuteQuery(query string) (statedb.ResultsIterator, error) {
-	panic("Method not supported for leveldb")
+	return nil, errors.New("ExecuteQuery not supported for leveldb")
 }
 
 // ApplyUpdates implements method in VersionedDB interface
 func (vdb *versionedDB) ApplyUpdates(batch *statedb.UpdateBatch, height *version.Height) error {
 	dbBatch := leveldbhelper.NewUpdateBatch()
-	for ck, vv := range batch.KVs {
-		compositeKey := constructCompositeKey(ck.Namespace, ck.Key)
-		// trace the first 200 characters of versioned value only, in case it is huge
-		if logger.IsEnabledFor(logging.DEBUG) {
-			versionedValueDump := fmt.Sprintf("%#v", vv)
-			if len(versionedValueDump) > 200 {
-				versionedValueDump = versionedValueDump[0:200] + "..."
+	namespaces := batch.GetUpdatedNamespaces()
+	for _, ns := range namespaces {
+		updates := batch.GetUpdates(ns)
+		for k, vv := range updates {
+			compositeKey := constructCompositeKey(ns, k)
+			// trace the first 200 characters of versioned value only, in case it is huge
+			if logger.IsEnabledFor(logging.DEBUG) {
+				versionedValueDump := fmt.Sprintf("%#v", vv)
+				if len(versionedValueDump) > 200 {
+					versionedValueDump = versionedValueDump[0:200] + "..."
+				}
+				logger.Debugf("Applying key=%#v, versionedValue=%s", compositeKey, versionedValueDump)
 			}
-			logger.Debugf("Applying key=%#v, versionedValue=%s", ck, versionedValueDump)
-		}
-		if vv.Value == nil {
-			dbBatch.Delete(compositeKey)
-		} else {
-			dbBatch.Put(compositeKey, encodeValue(vv.Value, vv.Version))
+			if vv.Value == nil {
+				dbBatch.Delete(compositeKey)
+			} else {
+				dbBatch.Put(compositeKey, statedb.EncodeValue(vv.Value, vv.Version))
+			}
 		}
 	}
 	dbBatch.Put(savePointKey, height.ToBytes())
@@ -157,22 +162,11 @@ func (vdb *versionedDB) GetLatestSavePoint() (*version.Height, error) {
 	if err != nil {
 		return nil, err
 	}
+	if versionBytes == nil {
+		return nil, nil
+	}
 	version, _ := version.NewHeightFromBytes(versionBytes)
 	return version, nil
-}
-
-func encodeValue(value []byte, version *version.Height) []byte {
-	encodedValue := version.ToBytes()
-	if value != nil {
-		encodedValue = append(encodedValue, value...)
-	}
-	return encodedValue
-}
-
-func decodeValue(encodedValue []byte) ([]byte, *version.Height) {
-	version, n := version.NewHeightFromBytes(encodedValue)
-	value := encodedValue[n:]
-	return value, version
 }
 
 func constructCompositeKey(ns string, key string) []byte {
@@ -197,8 +191,12 @@ func (scanner *kvScanner) Next() (statedb.QueryResult, error) {
 	if !scanner.dbItr.Next() {
 		return nil, nil
 	}
-	_, key := splitCompositeKey(scanner.dbItr.Key())
-	value, version := decodeValue(scanner.dbItr.Value())
+	dbKey := scanner.dbItr.Key()
+	dbVal := scanner.dbItr.Value()
+	dbValCopy := make([]byte, len(dbVal))
+	copy(dbValCopy, dbVal)
+	_, key := splitCompositeKey(dbKey)
+	value, version := statedb.DecodeValue(dbValCopy)
 	return &statedb.VersionedKV{
 		CompositeKey:   statedb.CompositeKey{Namespace: scanner.namespace, Key: key},
 		VersionedValue: statedb.VersionedValue{Value: value, Version: version}}, nil

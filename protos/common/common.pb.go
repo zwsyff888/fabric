@@ -7,8 +7,11 @@ Package common is a generated protocol buffer package.
 
 It is generated from these files:
 	common/common.proto
+	common/configtx.proto
 	common/configuration.proto
+	common/ledger.proto
 	common/msp_principal.proto
+	common/policies.proto
 
 It has these top-level messages:
 	LastConfiguration
@@ -28,15 +31,16 @@ It has these top-level messages:
 	SignedConfigurationItem
 	ConfigurationItem
 	ConfigurationSignature
-	Policy
-	SignaturePolicyEnvelope
-	SignaturePolicy
 	HashingAlgorithm
 	BlockDataHashingStructure
 	OrdererAddresses
+	BlockchainInfo
 	MSPPrincipal
 	OrganizationUnit
 	MSPRole
+	Policy
+	SignaturePolicyEnvelope
+	SignaturePolicy
 */
 package common
 
@@ -341,6 +345,9 @@ func (m *Block) GetMetadata() *BlockMetadata {
 	return nil
 }
 
+// BlockHeader is the element of the block which forms the block chain
+// The block header is hashed using the configured chain hashing algorithm
+// over the ASN.1 encoding of the BlockHeader
 type BlockHeader struct {
 	Number       uint64 `protobuf:"varint,1,opt,name=Number" json:"Number,omitempty"`
 	PreviousHash []byte `protobuf:"bytes,2,opt,name=PreviousHash,proto3" json:"PreviousHash,omitempty"`

@@ -25,6 +25,7 @@ import (
 	"time"
 
 	pb "github.com/golang/protobuf/proto"
+	"github.com/hyperledger/fabric/common/configtx/test"
 	"github.com/hyperledger/fabric/common/util"
 	"github.com/hyperledger/fabric/core/committer"
 	"github.com/hyperledger/fabric/core/ledger/ledgermgmt"
@@ -87,7 +88,7 @@ func (*naiveCryptoService) GetPKIidOfCert(peerIdentity api.PeerIdentityType) com
 
 // VerifyBlock returns nil if the block is properly signed,
 // else returns error
-func (*naiveCryptoService) VerifyBlock(signedBlock api.SignedBlock) error {
+func (*naiveCryptoService) VerifyBlock(chainID common.ChainID, signedBlock api.SignedBlock) error {
 	return nil
 }
 
@@ -108,6 +109,14 @@ func (*naiveCryptoService) Verify(peerIdentity api.PeerIdentityType, signature, 
 	return nil
 }
 
+// VerifyByChannel checks that signature is a valid signature of message
+// under a peer's verification key, but also in the context of a specific channel.
+// If the verification succeeded, Verify returns nil meaning no error occurred.
+// If peerIdentity is nil, then the signature is verified against this peer's verification key.
+func (*naiveCryptoService) VerifyByChannel(chainID common.ChainID, peerIdentity api.PeerIdentityType, signature, message []byte) error {
+	return nil
+}
+
 func (*naiveCryptoService) ValidateIdentity(peerIdentity api.PeerIdentityType) error {
 	return nil
 }
@@ -115,7 +124,7 @@ func (*naiveCryptoService) ValidateIdentity(peerIdentity api.PeerIdentityType) e
 func bootPeers(ids ...int) []string {
 	peers := []string{}
 	for _, id := range ids {
-		peers = append(peers, fmt.Sprintf("localhost:%d", (id+portPrefix)))
+		peers = append(peers, fmt.Sprintf("localhost:%d", id+portPrefix))
 	}
 	return peers
 }
@@ -164,6 +173,8 @@ func newGossipInstance(config *gossip.Config) gossip.Gossip {
 // Create new instance of KVLedger to be used for testing
 func newCommitter(id int) committer.Committer {
 	ledger, _ := ledgermgmt.CreateLedger(strconv.Itoa(id))
+	cb, _ := test.MakeGenesisBlock(util.GetTestChainID())
+	ledger.Commit(cb)
 	return committer.NewLedgerCommitter(ledger, &validator.MockValidator{})
 }
 
@@ -286,7 +297,7 @@ func TestNewGossipStateProvider_SendingManyMessages(t *testing.T) {
 
 	msgCount := 10
 
-	for i := 0; i < msgCount; i++ {
+	for i := 1; i <= msgCount; i++ {
 		rawblock := pcomm.NewBlock(uint64(i), []byte{})
 		if bytes, err := pb.Marshal(rawblock); err == nil {
 			payload := &proto.Payload{uint64(i), "", bytes}
@@ -326,8 +337,8 @@ func TestNewGossipStateProvider_SendingManyMessages(t *testing.T) {
 		logger.Debug("[*****]: Trying to see all peers get all blocks")
 		for _, p := range peersSet {
 			height, err := p.commit.LedgerHeight()
-			if height != uint64(msgCount) || err != nil {
-				logger.Debug("[XXXXXXX]: Ledger height is at: ", height)
+			if height != uint64(msgCount+1) || err != nil {
+				//logger.Debug("[XXXXXXX]: Ledger height is at: ", height)
 				return false
 			}
 		}
