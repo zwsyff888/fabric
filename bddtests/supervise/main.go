@@ -68,7 +68,7 @@ func Echo(ws *websocket.Conn) {
 		}
 		if reply == "secret id" {
 			json, _ := json.Marshal(PeersSlice)
-			logger.Infof("Peers0:%v,%v", PeersSlice[0].Timestamp, PeersSlice[0].Peername)
+			//logger.Infof("Peers0:%v,%v", PeersSlice[0].Timestamp, PeersSlice[0].Peername)
 			if err := websocket.Message.Send(ws, string(json)); err != nil {
 				fmt.Println("Can't send")
 				break
@@ -103,7 +103,7 @@ func main() {
 	http.Handle("/socket", websocket.Handler(Echo))
 	go func() {
 
-		if err := http.ListenAndServe(":7053", nil); err != nil {
+		if err := http.ListenAndServe(":7052", nil); err != nil {
 			log.Fatal("ListenAndServe:", err)
 		}
 
