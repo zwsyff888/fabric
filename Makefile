@@ -65,7 +65,7 @@ PROTOS = $(shell git ls-files *.proto | grep -v vendor)
 MSP_SAMPLECONFIG = $(shell git ls-files msp/sampleconfig/*.pem)
 GENESIS_SAMPLECONFIG = $(shell git ls-files common/configtx/test/*.template)
 PROJECT_FILES = $(shell git ls-files)
-IMAGES = peer orderer ccenv javaenv testenv zookeeper kafka
+IMAGES = peer orderer ccenv #javaenv testenv zookeeper kafka
 
 pkgmap.peer           := $(PKGNAME)/peer
 pkgmap.orderer        := $(PKGNAME)/orderer
