@@ -157,7 +157,7 @@ build/docker/gotools: gotools/Makefile
 
 # Both peer and peer-docker depend on ccenv and javaenv (all docker env images it supports).
 build/bin/peer: build/image/ccenv/$(DUMMY) #build/image/javaenv/$(DUMMY)
-build/image/peer/$(DUMMY): build/image/ccenv/$(DUMMY) build/image/javaenv/$(DUMMY)
+build/image/peer/$(DUMMY): build/image/ccenv/$(DUMMY) #build/image/javaenv/$(DUMMY)
 
 build/bin/%: $(PROJECT_FILES)
 	@mkdir -p $(@D)
