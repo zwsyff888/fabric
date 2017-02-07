@@ -73,7 +73,7 @@ pkgmap.block-listener := $(PKGNAME)/examples/events/block-listener
 
 include docker-env.mk
 
-all: native docker checks
+all: native docker #checks
 
 checks: linter unit-test behave
 
