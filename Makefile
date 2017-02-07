@@ -51,7 +51,7 @@ ARCH=$(shell uname -m)
 CHAINTOOL_RELEASE=v0.10.1
 BASEIMAGE_RELEASE=$(shell cat ./.baseimage-release)
 
-CHAINTOOL_URL ?= https://github.com/hyperledger/fabric-chaintool/releases/download/$(CHAINTOOL_RELEASE)/chaintool
+CHAINTOOL_URL ?= http://192.168.100.119:9000/software/chaintool_v0.10.1
 
 export GO_LDFLAGS
 
@@ -65,7 +65,7 @@ PROTOS = $(shell git ls-files *.proto | grep -v vendor)
 MSP_SAMPLECONFIG = $(shell git ls-files msp/sampleconfig/*.pem)
 GENESIS_SAMPLECONFIG = $(shell git ls-files common/configtx/test/*.template)
 PROJECT_FILES = $(shell git ls-files)
-IMAGES = peer orderer ccenv  testenv zookeeper kafka #javaenv
+IMAGES = peer orderer ccenv  #javaenv #testenv #zookeeper #kafka
 
 pkgmap.peer           := $(PKGNAME)/peer
 pkgmap.orderer        := $(PKGNAME)/orderer
