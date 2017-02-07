@@ -51,7 +51,7 @@ ARCH=$(shell uname -m)
 CHAINTOOL_RELEASE=v0.10.1
 BASEIMAGE_RELEASE=$(shell cat ./.baseimage-release)
 
-CHAINTOOL_URL ?= https://github.com/hyperledger/fabric-chaintool/releases/download/$(CHAINTOOL_RELEASE)/chaintool
+CHAINTOOL_URL ?= http://121.40.119.186:9000/software/chaintool_v0.10.1
 
 export GO_LDFLAGS
 
