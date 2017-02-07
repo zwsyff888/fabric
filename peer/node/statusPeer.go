@@ -3,6 +3,7 @@ package node
 import (
 	"encoding/base64"
 	"fmt"
+	// "github.com/golang/protobuf/proto"
 	"log"
 	"net"
 	"os"
@@ -14,6 +15,7 @@ import (
 	"github.com/hyperledger/fabric/protos/common"
 	pb "github.com/hyperledger/fabric/protos/peer"
 	"github.com/hyperledger/fabric/protos/utils"
+	"github.com/spf13/viper"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
@@ -105,7 +107,7 @@ func (s *server) QueryMessage(ctx context.Context, query *pb.QueryBlocks) (*pb.M
 }
 
 func PeerServer() {
-	port := os.Getenv("CORE_PEER_GRPCPORTS")
+	port := viper.GetString("peer.statusPeer.grpcServerPort") //os.Getenv("CORE_PEER_GRPCPORTS")
 	lis, err := net.Listen("tcp", port)
 	// fmt.Println("i am come here!!!")
 	if err != nil {
@@ -126,8 +128,8 @@ func PeerServer() {
 }
 
 func StatusClient() {
-	address := os.Getenv("CORE_PEER_GRPCSERVER")
-	strTimeCycle := os.Getenv("CORE_PEER_SENDGRPC_TIME")
+	address := viper.GetString("peer.statusPeer.sendGrpcServer")       //os.Getenv("CORE_PEER_GRPCSERVER")
+	strTimeCycle := viper.GetString("peer.statusPeer.sendStatusCycle") //os.Getenv("CORE_PEER_SENDGRPC_TIME")
 	timeCycle, err := strconv.Atoi(strTimeCycle)
 	if err != nil {
 		panic(err)
@@ -175,8 +177,10 @@ func getPeerStatus() *pb.MessageInput {
 	// legder := peer.GetLedger(chainID)
 
 	//获取当前节点的peer身份
-	peerId := peer.GetLocalIP()
+	// peerId := peer.GetLocalIP()
 	peerName := os.Getenv("CORE_PEER_ID")
+	// peerName := os.Getenv("CORE_PEER_ID")
+	peerId := os.Getenv("CORE_PEER_ADDRESS")
 
 	//链信息
 	height, err := commit.LedgerHeight()

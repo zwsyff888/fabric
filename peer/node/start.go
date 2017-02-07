@@ -243,8 +243,11 @@ func serve(args []string) error {
 	common.SetLogLevelFromViper("error")
 	common.SetLogLevelFromViper("msp")
 
-	go StatusClient()
-	go PeerServer()
+	peerStatusBool := viper.GetBool("peer.statusPeer.enabled")
+	if peerStatusBool {
+		go StatusClient()
+		go PeerServer()
+	}
 
 	// Block until grpc server exits
 	return <-serve
