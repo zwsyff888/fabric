@@ -28,7 +28,7 @@ import (
 	"github.com/hyperledger/fabric/gossip/gossip/algo"
 	"github.com/hyperledger/fabric/gossip/gossip/pull"
 	"github.com/hyperledger/fabric/gossip/identity"
-	"github.com/hyperledger/fabric/gossip/proto"
+	"github.com/hyperledger/fabric/protos/gossip"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -110,7 +110,7 @@ func testCertificateUpdate(t *testing.T, updateFactory func(uint64) comm.Receive
 		PullInterval:      time.Millisecond * 500,
 		Tag:               proto.GossipMessage_EMPTY,
 		Channel:           nil,
-		Id:                "id1",
+		ID:                "id1",
 	}
 	sender := &senderMock{}
 	memberSvc := &membershipSvcMock{}

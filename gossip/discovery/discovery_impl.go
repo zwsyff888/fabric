@@ -24,8 +24,8 @@ import (
 	"time"
 
 	"github.com/hyperledger/fabric/gossip/common"
-	"github.com/hyperledger/fabric/gossip/proto"
 	"github.com/hyperledger/fabric/gossip/util"
+	"github.com/hyperledger/fabric/protos/gossip"
 	"github.com/op/go-logging"
 )
 
@@ -91,7 +91,7 @@ type gossipDiscoveryImpl struct {
 
 	toDieChan chan struct{}
 	toDieFlag int32
-	logger    *util.Logger
+	logger    *logging.Logger
 }
 
 // NewDiscoveryService returns a new discovery service with the comm module passed and the crypto service passed
@@ -117,8 +117,6 @@ func NewDiscoveryService(bootstrapPeers []string, self NetworkMember, comm CommS
 		toDieFlag:      int32(0),
 		logger:         util.GetLogger(util.LoggingDiscoveryModule, self.Endpoint),
 	}
-
-	d.logger.SetLevel(logging.WARNING)
 
 	go d.periodicalSendAlive()
 	go d.periodicalCheckAlive()

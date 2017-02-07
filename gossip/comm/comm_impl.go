@@ -30,8 +30,8 @@ import (
 	"github.com/hyperledger/fabric/gossip/api"
 	"github.com/hyperledger/fabric/gossip/common"
 	"github.com/hyperledger/fabric/gossip/identity"
-	"github.com/hyperledger/fabric/gossip/proto"
 	"github.com/hyperledger/fabric/gossip/util"
+	"github.com/hyperledger/fabric/protos/gossip"
 	"github.com/op/go-logging"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
@@ -113,8 +113,6 @@ func NewCommInstanceWithServer(port int, idMapper identity.Mapper, peerIdentity 
 		proto.RegisterGossipServer(s, commInst)
 	}
 
-	commInst.logger.SetLevel(logging.WARNING)
-
 	return commInst, nil
 }
 
@@ -143,7 +141,7 @@ type commImpl struct {
 	selfCertHash      []byte
 	peerIdentity      api.PeerIdentityType
 	idMapper          identity.Mapper
-	logger            *util.Logger
+	logger            *logging.Logger
 	opts              []grpc.DialOption
 	connStore         *connectionStore
 	PKIID             []byte
@@ -405,7 +403,7 @@ func (c *commImpl) authenticateRemotePeer(stream stream) (common.PKIidType, erro
 		}
 	}
 
-	cMsg = createConnectionMsg(c.PKIID, c.selfCertHash, c.peerIdentity, signer)
+	cMsg = c.createConnectionMsg(c.PKIID, c.selfCertHash, c.peerIdentity, signer)
 
 	c.logger.Debug("Sending", cMsg, "to", remoteAddress)
 	stream.Send(cMsg)
@@ -528,7 +526,7 @@ func readWithTimeout(stream interface{}, timeout time.Duration) *proto.GossipMes
 	}
 }
 
-func createConnectionMsg(pkiID common.PKIidType, hash []byte, cert api.PeerIdentityType, signer proto.Signer) *proto.GossipMessage {
+func (c *commImpl) createConnectionMsg(pkiID common.PKIidType, hash []byte, cert api.PeerIdentityType, signer proto.Signer) *proto.GossipMessage {
 	m := &proto.GossipMessage{
 		Tag:   proto.GossipMessage_EMPTY,
 		Nonce: 0,
@@ -540,7 +538,10 @@ func createConnectionMsg(pkiID common.PKIidType, hash []byte, cert api.PeerIdent
 			},
 		},
 	}
-	m.Sign(signer)
+	if err := m.Sign(signer); err != nil {
+		c.logger.Panicf("Gossip failed to sign a message using the peer identity.\n Halting execution.\nActual error: %v", err)
+	}
+
 	return m
 }
 

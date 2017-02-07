@@ -33,8 +33,9 @@ import (
 	"github.com/hyperledger/fabric/gossip/gossip/msgstore"
 	"github.com/hyperledger/fabric/gossip/gossip/pull"
 	"github.com/hyperledger/fabric/gossip/identity"
-	"github.com/hyperledger/fabric/gossip/proto"
 	"github.com/hyperledger/fabric/gossip/util"
+	"github.com/hyperledger/fabric/protos/gossip"
+	"github.com/op/go-logging"
 	"google.golang.org/grpc"
 )
 
@@ -56,7 +57,7 @@ type gossipServiceImpl struct {
 	incTime               time.Time
 	selfOrg               api.OrgIdentityType
 	*comm.ChannelDeMultiplexer
-	logger            *util.Logger
+	logger            *logging.Logger
 	stopSignal        *sync.WaitGroup
 	conf              *Config
 	toDieChan         chan struct{}
@@ -687,10 +688,10 @@ type discoverySecurityAdapter struct {
 	idMapper identity.Mapper
 	mcs      api.MessageCryptoService
 	c        comm.Comm
-	logger   *util.Logger
+	logger   *logging.Logger
 }
 
-func newDiscoverySecurityAdapter(idMapper identity.Mapper, mcs api.MessageCryptoService, c comm.Comm, logger *util.Logger) *discoverySecurityAdapter {
+func newDiscoverySecurityAdapter(idMapper identity.Mapper, mcs api.MessageCryptoService, c comm.Comm, logger *logging.Logger) *discoverySecurityAdapter {
 	return &discoverySecurityAdapter{
 		idMapper: idMapper,
 		mcs:      mcs,
@@ -788,7 +789,7 @@ func (g *gossipServiceImpl) createCertStorePuller() pull.Mediator {
 	conf := pull.PullConfig{
 		MsgType:           proto.PullMsgType_IdentityMsg,
 		Channel:           []byte(""),
-		Id:                g.conf.SelfEndpoint,
+		ID:                g.conf.SelfEndpoint,
 		PeerCountToSelect: g.conf.PullPeerNum,
 		PullInterval:      g.conf.PullInterval,
 		Tag:               proto.GossipMessage_EMPTY,
