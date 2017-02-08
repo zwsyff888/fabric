@@ -7,12 +7,13 @@ import (
 )
 
 type PeerMessage struct {
-	Time    int64
-	PeerIp  string
-	Height  uint64
-	Status  int64
-	Name    string
-	Mblocks []*Mblock
+	Time      int64
+	PeerIp    string
+	Height    uint64
+	Status    int64
+	Name      string
+	Mblocks   []*Mblock
+	ChannelID string
 }
 
 func NewPeerMessage() *PeerMessage {
@@ -26,6 +27,7 @@ func (m *PeerMessage) InitMessage(inputMessage *pb.MessageInput) {
 	m.Name = inputMessage.PeerName
 	m.Mblocks = []*Mblock{}
 	m.Status = 1
+	m.ChannelID = inputMessage.ChannelID
 
 	length := len(inputMessage.Mblocks)
 	for index := 0; index < length; index++ {

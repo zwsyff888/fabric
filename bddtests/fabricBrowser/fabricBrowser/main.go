@@ -8,13 +8,16 @@ import (
 )
 
 func main() {
-	logs.Debug("hehehehehehe")
+	logs.Debug("hehehehehehe!!!!")
 	go models.StartServer()
 	go models.CheckEnable()
 	// logs.Debug("hehehehehehe")
 	// go models.StartServer()
-	models.PeerStatusMap = make(map[string]*models.PeerMessage)
+	models.AllChannelPeerStatusMap = make(map[string](map[string]*models.PeerMessage))
 	// models.QueryClient()
+	logs.Debug(models.AllChannelPeerStatusMap)
+
+	beego.SetStaticPath("/super", "static/supervise")
 	beego.Run()
 
 }

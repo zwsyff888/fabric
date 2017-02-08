@@ -16,13 +16,13 @@ type ApiPeerStatus struct {
 
 type ApiPeerList []*ApiPeerStatus
 
-func GetPeerStatusMap() ApiPeerList {
-
+func GetPeerStatusMap(chainid string) ApiPeerList {
+	PeerStatusMap := AllChannelPeerStatusMap[chainid]
 	ans := ApiPeerList{}
 	// var index int64
 	index := 0
 	for key := range PeerStatusMap {
-		ans = append(ans, makePeerStatus(key, index))
+		ans = append(ans, makePeerStatus(key, index, PeerStatusMap))
 		index = index + 1
 	}
 
@@ -48,7 +48,7 @@ func (list ApiPeerList) Len() int {
 	return len(list)
 }
 
-func makePeerStatus(id string, index int) *ApiPeerStatus {
+func makePeerStatus(id string, index int, PeerStatusMap map[string]*PeerMessage) *ApiPeerStatus {
 	// strindex := strconv.Itoa(index)
 
 	ans := &ApiPeerStatus{}

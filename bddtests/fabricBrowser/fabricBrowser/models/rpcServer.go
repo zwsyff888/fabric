@@ -24,15 +24,30 @@ type ClientInfo struct {
 	name   string
 }
 
-func (s *server) ProcessMessage(ctx context.Context, inputMessage *pb.MessageInput) (*pb.MessageOutput, error) {
+func (s *server) ProcessMessage(ctx context.Context, inputMessage *pb.ChannelMessage) (*pb.MessageOutput, error) {
 
 	//message
-	peerMessage := NewPeerMessage()
-	peerMessage.InitMessage(inputMessage)
+	MapMutex.Lock()
+	defer MapMutex.Unlock()
+	for i := 0; i < len(inputMessage.ChannelInput); i++ {
+		peerMessage := NewPeerMessage()
+		peerMessage.InitMessage(inputMessage.ChannelInput[i])
 
-	PeerStatusMap[peerMessage.PeerIp] = peerMessage
+		tmpKey := peerMessage.Name + peerMessage.PeerIp
 
-	fmt.Println("@@@@chenqiao: ", PeerStatusMap)
+		peerKey := peerMessage.ChannelID
+
+		if _, ok := AllChannelPeerStatusMap[peerKey]; ok {
+			//此处可能存在线程不安全
+			AllChannelPeerStatusMap[peerKey][tmpKey] = peerMessage
+		} else {
+			AllChannelPeerStatusMap[peerKey] = make(map[string]*PeerMessage)
+			AllChannelPeerStatusMap[peerKey][tmpKey] = peerMessage
+		}
+
+	}
+
+	fmt.Println("@@@@chenqiao: ", AllChannelPeerStatusMap)
 
 	return &pb.MessageOutput{Output: "hehe " + "I GOT IT"}, nil
 }
