@@ -74,7 +74,7 @@ func CheckEnable() {
 			for _, value := range PeerStatusMap {
 				// fmt.Println("@@@@chenqiao Check Time: ", now-value.Time)
 				if now-value.Time > (FabricTimeCycle + BufferTime) {
-					value.Status = 2
+					value.Status = 0
 				}
 			}
 			// fmt.Println("@@@@chenqiao Check : ", PeerStatusMap["172.18.0.3"])
