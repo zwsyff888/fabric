@@ -5,6 +5,7 @@ import (
 	"fmt"
 	// "github.com/golang/protobuf/proto"
 	"github.com/hyperledger/fabric/common/util"
+	"github.com/hyperledger/fabric/core/ledger/ledgermgmt"
 	"github.com/hyperledger/fabric/core/peer"
 	"github.com/hyperledger/fabric/protos/common"
 	pb "github.com/hyperledger/fabric/protos/peer"
@@ -106,7 +107,7 @@ func (s *server) QueryMessage(ctx context.Context, query *pb.QueryBlocks) (*pb.M
 }
 
 func PeerServer() {
-	port := port := viper.GetString("peer.statusPeer.grpcServerPort")//os.Getenv("CORE_PEER_GRPCPORTS")
+	port := viper.GetString("peer.statusPeer.grpcServerPort") //os.Getenv("CORE_PEER_GRPCPORTS")
 	lis, err := net.Listen("tcp", port)
 	// fmt.Println("i am come here!!!")
 	if err != nil {
@@ -127,8 +128,9 @@ func PeerServer() {
 }
 
 func StatusClient() {
-	address := viper.GetString("peer.statusPeer.sendGrpcServer")//os.Getenv("CORE_PEER_GRPCSERVER")
-	strTimeCycle := viper.GetString("peer.statusPeer.sendStatusCycle")//os.Getenv("CORE_PEER_SENDGRPC_TIME")
+	// fmt.Println("@@@@@chenqiao test:  ", viper.GetString("peer.networkId"))
+	address := viper.GetString("peer.statusPeer.sendGrpcServer")       //os.Getenv("CORE_PEER_GRPCSERVER")
+	strTimeCycle := viper.GetString("peer.statusPeer.sendStatusCycle") //os.Getenv("CORE_PEER_SENDGRPC_TIME")
 	timeCycle, err := strconv.Atoi(strTimeCycle)
 	if err != nil {
 		panic(err)
@@ -163,63 +165,82 @@ func StatusClient() {
 			continue
 		}
 		// log.Printf("Greeting: %s", r.Output)
-		// fmt.Println("@@@@@@ chenqiao: Greeeting: ", r.Output)
+		fmt.Println("@@@@@@ chenqiao: Greeeting: ", r.Output)
 		time.Sleep(time.Duration(timeCycle) * 1e9)
 		conn.Close()
 	}
 }
 
-func getPeerStatus() *pb.MessageInput {
-
-	chainID := util.GetTestChainID()
-	commit := peer.GetCommitter(chainID)
-	// legder := peer.GetLedger(chainID)
-
-	//获取当前节点的peer身份
-	peerId := peer.GetLocalIP()
-	peerName := os.Getenv("CORE_PEER_ID")
-
-	//链信息
-	height, err := commit.LedgerHeight()
+func getPeerStatus() *pb.ChannelMessage {
+	ledgerIds, err := ledgermgmt.GetLedgerIDs()
 	if err != nil {
-		fmt.Println("@@@@@@@ chenqiao: no height !!!!!!")
+		return nil
 	}
 
-	//块信息
-	blocksids := []uint64{}
-	var i uint64
+	cM := &pb.ChannelMessage{}
 
-	//只获取最新的100块
-	if height > 100 {
-		i = height - 100
-	} else {
-		i = 0
-	}
-	for ; i < height; i++ {
-		blocksids = append(blocksids, uint64(i))
-	}
+	for _, chainID := range ledgerIds {
+		fmt.Println("@@@@@@@chenqiao: chainID ", chainID)
+		commit := peer.GetCommitter(chainID)
+		if commit == nil {
+			fmt.Println("@@@@@chenqiao: the commit is nil, don't care")
+			continue
+		}
 
-	//封装消息
-	ans := &pb.MessageInput{}
+		//获取当前节点的peer身份
+		// peerId := peer.GetLocalIP()
 
-	ans.PeerIp = peerId
-	ans.Height = height
-	ans.PeerName = peerName
+		peerName := os.Getenv("CORE_PEER_ID")
+		peerId := os.Getenv("CORE_PEER_ADDRESS")
+		// peerId := peerName + peerKey
 
-	mblock := []*pb.Mblock{}
+		//链信息
+		height, err := commit.LedgerHeight()
+		if err != nil {
+			fmt.Println("@@@@@@@ chenqiao: no height !!!!!!")
+			continue
+		}
 
-	if height != 0 {
+		//块信息
+		blocksids := []uint64{}
+		var i uint64
 
-		blocks := commit.GetBlocks(blocksids)
+		//只获取最新的100块
+		if height > 100 {
+			i = height - 100
+		} else {
+			i = 0
+		}
+		for ; i < height; i++ {
+			blocksids = append(blocksids, uint64(i))
+		}
 
-		for j := 0; j < len(blocks); j++ {
-			tmpmblock := getBlockDataByIndex(j, blocks)
-			mblock = append(mblock, tmpmblock)
+		//封装消息
+		ans := &pb.MessageInput{}
+
+		ans.PeerIp = peerId
+		ans.Height = height
+		ans.PeerName = peerName
+		ans.ChannelID = chainID
+
+		mblock := []*pb.Mblock{}
+
+		if height != 0 {
+
+			blocks := commit.GetBlocks(blocksids)
+
+			for j := 0; j < len(blocks); j++ {
+				tmpmblock := getBlockDataByIndex(j, blocks)
+				mblock = append(mblock, tmpmblock)
+
+			}
 
 		}
 
+		ans.Mblocks = mblock
+		cM.ChannelInput = append(cM.ChannelInput, ans)
+
 	}
 
-	ans.Mblocks = mblock
-	return ans
+	return cM
 }

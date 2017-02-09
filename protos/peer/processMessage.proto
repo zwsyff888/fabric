@@ -11,8 +11,7 @@ package protos;
 import "google/protobuf/timestamp.proto";
 
 service statusPeer {
-	rpc ProcessMessage(MessageInput) returns (MessageOutput) {}
-    
+    rpc ProcessMessage(ChannelMessage) returns (MessageOutput) {}    
 }
 
 service queryPeer{
@@ -21,18 +20,23 @@ service queryPeer{
 
 message QueryBlocks{
     uint64 BlockIndex = 1;
+    string ChannelID = 2;
 }
 
+message ChannelMessage{
+    repeated MessageInput ChannelInput = 1;
+}
 
 message MessageInput{
-	string PeerIp = 1;
-	uint64 Height = 2;
+    string PeerIp = 1;
+    uint64 Height = 2;
     string PeerName = 3;
-	repeated Mblock Mblocks = 4;
+    repeated Mblock Mblocks = 4;
+    string ChannelID = 5;
 }
 
 message Mblock{
-	MblockHeader Header = 1;
+    MblockHeader Header = 1;
     MblockData Data = 2;
     MblockMetadata Metadata = 3;
 }
@@ -59,5 +63,5 @@ message MblockMetadata {
 }
 
 message MessageOutput{
-	string output = 1;
+    string output = 1;
 }
