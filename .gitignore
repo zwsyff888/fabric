@@ -35,3 +35,4 @@ report.xml
 .gradle
 build/
 bin/
+devenv/Vagrantfile
