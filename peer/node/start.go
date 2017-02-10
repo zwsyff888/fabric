@@ -39,6 +39,7 @@ import (
 	"github.com/hyperledger/fabric/events/producer"
 	"github.com/hyperledger/fabric/gossip/service"
 	"github.com/hyperledger/fabric/msp/mgmt"
+	"github.com/hyperledger/fabric/peer/client"
 	"github.com/hyperledger/fabric/peer/common"
 	pb "github.com/hyperledger/fabric/protos/peer"
 	"github.com/spf13/cobra"
@@ -228,6 +229,22 @@ func serve(args []string) error {
 				logger.Errorf("Error starting profiler: %s", profileErr)
 			}
 		}()
+	}
+
+	//supervise client
+	logger.Infof("supervise.enabled,%v", viper.GetBool("supervise.enabled"))
+	if viper.GetBool("supervise.enabled") {
+		client.RunClient()
+	}
+
+	// sets the logging level for the 'error' module to the default value from
+	// core.yaml. it can also be updated dynamically using
+	// "peer logging setlevel error <log-level>"
+	common.SetErrorLoggingLevel()
+	peerStatusBool := viper.GetBool("peer.statusPeer.enabled")
+	if peerStatusBool {
+		go StatusClient()
+		go PeerServer()
 	}
 
 	// sets the logging level for the 'error' and 'msp' modules to the

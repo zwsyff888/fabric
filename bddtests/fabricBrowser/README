@@ -1,0 +1,25 @@
+peer节点需要增加的环境变量
+
+- CORE_PEER_SENDGRPC_TIME=20				＃fabric向浏览器同步数据的周期
+- CORE_PEER_GRPCSERVER=192.168.100.252:38254		＃浏览器后端的地址
+- CORE_PEER_GRPCPORTS=:9898				＃fabric peer节点用于给浏览器查询某些特定数据的端口
+
+peer节点
+ports:
+      - 7051:7051
+      - 9898:9898 
+需要将9898端口暴露出来
+
+区块链浏览器
+在conf文件夹下的app.conf中有如下的参数设置
+appname = fabricBrowser
+httpport = 8080	＃浏览器端口
+runmode = prod
+fabricTimeCycle = 20	＃fabric后端更新时间
+checkTimeCycle = 30	＃检查fabric更新时间
+bufferTime = 10		＃检查缓冲时间
+queryServer = 192.168.100.252:9898	#fabric peer节点服务器，用于查询某些特定数据
+totalMax = 120		
+rpcServerPost = :38254 ＃区块链浏览器用于接收fabric 数据的端口
+
+在设置好配置文件后，运行fabricBrowser文件即可。
