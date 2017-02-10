@@ -21,39 +21,44 @@ import (
 	"testing"
 
 	cb "github.com/hyperledger/fabric/protos/common"
-	"github.com/hyperledger/fabric/protos/utils"
 	"github.com/stretchr/testify/assert"
 )
 
 func verifyItemsResult(t *testing.T, template Template, count int) {
 	newChainID := "foo"
 
-	result, err := template.Items(newChainID)
+	configEnv, err := template.Envelope(newChainID)
 	if err != nil {
-		t.Fatalf("Should not have errored")
+		t.Fatalf("Should not have errored: %s", err)
 	}
 
-	if len(result) != count {
-		t.Errorf("Expected %d items, but got %d", count, len(result))
+	configNext, err := UnmarshalConfigNext(configEnv.Config)
+	if err != nil {
+		t.Fatalf("Should not have errored: %s", err)
+	}
+	config := ConfigNextToConfig(configNext)
+
+	if len(config.Items) != count {
+		t.Errorf("Expected %d items, but got %d", count, len(config.Items))
 	}
 
-	for i, signedItem := range result {
-		item := utils.UnmarshalConfigurationItemOrPanic(signedItem.ConfigurationItem)
-		assert.Equal(t, newChainID, item.Header.ChainID, "Should have appropriately set new chainID")
-		expected := fmt.Sprintf("%d", i)
-		assert.Equal(t, expected, string(item.Value), "Expected %s but got %s", expected, item.Value)
-		assert.Equal(t, int32(cb.HeaderType_CONFIGURATION_ITEM), item.Header.Type)
+	for i, _ := range config.Items {
+		count := 0
+		for _, item := range config.Items {
+			key := fmt.Sprintf("%d", i)
+			if key == item.Key {
+				count++
+			}
+		}
+		expected := 1
+		assert.Equal(t, expected, count, "Expected %d but got %d for %d", expected, count, i)
 	}
 }
 
 func TestSimpleTemplate(t *testing.T) {
-	hdr := &cb.ChainHeader{
-		ChainID: "foo",
-		Type:    int32(cb.HeaderType_CONFIGURATION_ITEM),
-	}
 	simple := NewSimpleTemplate(
-		&cb.ConfigurationItem{Value: []byte("0"), Header: hdr},
-		&cb.ConfigurationItem{Value: []byte("1"), Header: hdr},
+		&cb.ConfigItem{Type: cb.ConfigItem_Orderer, Key: "0"},
+		&cb.ConfigItem{Type: cb.ConfigItem_Orderer, Key: "1"},
 	)
 	verifyItemsResult(t, simple, 2)
 }
@@ -61,11 +66,11 @@ func TestSimpleTemplate(t *testing.T) {
 func TestCompositeTemplate(t *testing.T) {
 	composite := NewCompositeTemplate(
 		NewSimpleTemplate(
-			&cb.ConfigurationItem{Value: []byte("0")},
-			&cb.ConfigurationItem{Value: []byte("1")},
+			&cb.ConfigItem{Type: cb.ConfigItem_Orderer, Key: "0"},
+			&cb.ConfigItem{Type: cb.ConfigItem_Orderer, Key: "1"},
 		),
 		NewSimpleTemplate(
-			&cb.ConfigurationItem{Value: []byte("2")},
+			&cb.ConfigItem{Type: cb.ConfigItem_Orderer, Key: "2"},
 		),
 	)
 
@@ -74,36 +79,53 @@ func TestCompositeTemplate(t *testing.T) {
 
 func TestNewChainTemplate(t *testing.T) {
 	simple := NewSimpleTemplate(
-		&cb.ConfigurationItem{Value: []byte("1")},
-		&cb.ConfigurationItem{Value: []byte("2")},
+		&cb.ConfigItem{Type: cb.ConfigItem_Orderer, Key: "0"},
+		&cb.ConfigItem{Type: cb.ConfigItem_Orderer, Key: "1"},
 	)
 
 	creationPolicy := "Test"
 	nct := NewChainCreationTemplate(creationPolicy, simple)
 
 	newChainID := "foo"
-	items, err := nct.Items(newChainID)
+	configEnv, err := nct.Envelope(newChainID)
 	if err != nil {
-		t.Fatalf("Error creation a chain creation configuration")
+		t.Fatalf("Error creation a chain creation config")
 	}
 
-	if expected := 3; len(items) != expected {
-		t.Fatalf("Expected %d items, but got %d", expected, len(items))
+	configNext, err := UnmarshalConfigNext(configEnv.Config)
+	if err != nil {
+		t.Fatalf("Should not have errored: %s", err)
+	}
+	config := ConfigNextToConfig(configNext)
+
+	if expected := 3; len(config.Items) != expected {
+		t.Fatalf("Expected %d items, but got %d", expected, len(config.Items))
 	}
 
-	for i, signedItem := range items {
-		item := utils.UnmarshalConfigurationItemOrPanic(signedItem.ConfigurationItem)
-		if item.Header.ChainID != newChainID {
-			t.Errorf("Should have appropriately set new chainID")
+	for i, _ := range config.Items {
+		if i == len(config.Items)-1 {
+			break
 		}
-		if i == 0 {
-			if item.Key != CreationPolicyKey {
-				t.Errorf("First item should have been the creation policy")
-			}
-		} else {
-			if expected := fmt.Sprintf("%d", i); string(item.Value) != expected {
-				t.Errorf("Expected %s but got %s", expected, item.Value)
+		count := 0
+		for _, item := range config.Items {
+			key := fmt.Sprintf("%d", i)
+			if key == item.Key {
+				count++
 			}
 		}
+		expected := 1
+		assert.Equal(t, expected, count, "Expected %d but got %d for %d", expected, count, i)
+	}
+
+	foundCreationPolicy := false
+	for _, item := range config.Items {
+		if item.Key == CreationPolicyKey {
+			foundCreationPolicy = true
+			continue
+		}
+	}
+
+	if !foundCreationPolicy {
+		t.Errorf("Should have found the creation policy")
 	}
 }

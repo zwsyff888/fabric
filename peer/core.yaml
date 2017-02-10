@@ -36,6 +36,7 @@ logging:
     version:    warning
     protoutils: debug
     error:      warning
+    msp:        warning
 
     format: '%{color}%{time:2006-01-02 15:04:05.000 MST} [%{module}] %{shortfunc} -> %{level:.4s} %{id:03x}%{color:reset} %{message}'
 
@@ -71,6 +72,34 @@ peer:
         bootstrap: 0.0.0.0:7051
         # For debug - is peer is its org leader and should pass blocks from orderer to other peers in org
         orgLeader: true
+        # ID of this instance
+        endpoint:
+        # Maximum count of blocks we store in memory
+        maxBlockCountToStore: 100
+        # Max time between consecutive message pushes(unit: millisecond)
+        maxPropagationBurstLatency: 10ms
+        # Max number of messages stored until it triggers a push to remote peers
+        maxPropagationBurstSize: 10
+        # Number of times a message is pushed to remote peers
+        propagateIterations: 1
+        # Number of peers selected to push messages to
+        propagatePeerNum: 3
+        # Determines frequency of pull phases(unit: second)
+        pullInterval: 4s
+        # Number of peers to pull from
+        pullPeerNum: 3
+        # Determines frequency of pulling state info messages from peers(unit: second)
+        requestStateInfoInterval: 4s
+        # Determines frequency of pushing state info messages to peers(unit: second)
+        publishStateInfoInterval: 4s
+        # Maximum time a stateInfo message is kept until expired
+        stateInfoRetentionInterval:
+        # Time from startup certificates are included in Alive messages(unit: second)
+        publishCertPeriod: 10s
+        # Should we skip verifying block messages or not
+        skipBlockVerification: false
+        # Should we ignore security or not
+        ignoreSecurity: false
 
     # Sync related configuration
     sync:
@@ -149,7 +178,7 @@ peer:
     fileSystemPath: /var/hyperledger/production
 
     # Path on the file system where peer will find MSP local configurations
-    mspConfigPath: /etc/hyperledger/fabric/msp/sampleconfig
+    mspConfigPath: msp/sampleconfig
 
     # Used with Go profiling tools only in none production environment. In
     # production, it should be disabled (eg enabled: false)
@@ -186,6 +215,10 @@ vm:
                 file: /path/to/ca.pem
             key:
                 file: /path/to/server-key.pem
+
+        # Enables/disables the standard out/err from chaincode containers for debugging purposes
+        attachStdout: false
+
         # Parameters of docker container creating. For docker can created by custom parameters
         # If you have your own ipam & dns-server for cluster you can use them to create container efficient.
         # NetworkMode Sets the networking mode for the container. Supported standard values are: `host`(default),`bridge`,`ipvlan`,`none`
@@ -228,7 +261,6 @@ chaincode:
         # be appended depedendent upon the chaincode specification.
         Dockerfile:  |
           FROM hyperledger/fabric-ccenv:$(ARCH)-$(PROJECT_VERSION)
-          COPY src $GOPATH/src
           WORKDIR $GOPATH
 
     car:
@@ -304,11 +336,8 @@ ledger:
        queryLimit: 1000
 
     # historyDatabase - options are true or false
-    # Indicates if the transaction history should be stored in
-    # a querable database such as "CouchDB".
-    # The stateDatabase must be also stored in CouchDB for
-    # history to be enabled.
-    historyDatabase: false
+    # Indicates if the history of key updates should be stored in goleveldb
+    historyDatabase: true
 
 ###############################################################################
 #

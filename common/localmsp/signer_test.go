@@ -21,8 +21,8 @@ import (
 	"testing"
 
 	"github.com/hyperledger/fabric/core/crypto/primitives"
+	mspmgmt "github.com/hyperledger/fabric/msp/mgmt"
 	"github.com/stretchr/testify/assert"
-	"github.com/hyperledger/fabric/core/peer/msp"
 )
 
 func TestMain(m *testing.M) {
@@ -30,7 +30,7 @@ func TestMain(m *testing.M) {
 	var mspMgrConfigDir string
 	var alternativeCfgPath = os.Getenv("ORDERER_CFG_PATH")
 	if alternativeCfgPath != "" {
-		mspMgrConfigDir = alternativeCfgPath + "/msp/sampleconfig/"
+		mspMgrConfigDir = alternativeCfgPath + "/../msp/sampleconfig/"
 	} else if _, err := os.Stat("./msp/sampleconfig/"); err == nil {
 		mspMgrConfigDir = "./msp/sampleconfig/"
 	} else {

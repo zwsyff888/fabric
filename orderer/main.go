@@ -35,6 +35,10 @@ import (
 	ramledger "github.com/hyperledger/fabric/orderer/ledger/ram"
 	"github.com/hyperledger/fabric/orderer/localconfig"
 	"github.com/hyperledger/fabric/orderer/multichain"
+	"github.com/hyperledger/fabric/orderer/sbft"
+	"github.com/hyperledger/fabric/orderer/sbft/backend"
+	sbftcrypto "github.com/hyperledger/fabric/orderer/sbft/crypto"
+	"github.com/hyperledger/fabric/orderer/sbft/simplebft"
 	"github.com/hyperledger/fabric/orderer/solo"
 	cb "github.com/hyperledger/fabric/protos/common"
 	ab "github.com/hyperledger/fabric/protos/orderer"
@@ -42,7 +46,7 @@ import (
 
 	"github.com/Shopify/sarama"
 	"github.com/hyperledger/fabric/common/localmsp"
-	"github.com/hyperledger/fabric/core/peer/msp"
+	mspmgmt "github.com/hyperledger/fabric/msp/mgmt"
 	logging "github.com/op/go-logging"
 )
 
@@ -143,7 +147,8 @@ func main() {
 
 	consenters := make(map[string]multichain.Consenter)
 	consenters["solo"] = solo.New()
-	consenters["kafka"] = kafka.New(conf.Kafka.Version, conf.Kafka.Retry)
+	consenters["kafka"] = kafka.New(conf.Kafka.Version, conf.Kafka.Retry, conf.Kafka.TLS)
+	consenters["sbft"] = sbft.New(makeSbftConsensusConfig(conf), makeSbftStackConfig(conf))
 
 	manager := multichain.NewManagerImpl(lf, consenters, localmsp.NewSigner())
 
@@ -156,4 +161,23 @@ func main() {
 	ab.RegisterAtomicBroadcastServer(grpcServer.Server(), server)
 	logger.Infof("Beginning to serve requests")
 	grpcServer.Start()
+}
+
+func makeSbftConsensusConfig(conf *config.TopLevel) *sbft.ConsensusConfig {
+	cfg := simplebft.Config{N: conf.Genesis.SbftShared.N, F: conf.Genesis.SbftShared.F,
+		BatchDurationNsec:  uint64(conf.Genesis.BatchTimeout),
+		BatchSizeBytes:     uint64(conf.Genesis.BatchSize.AbsoluteMaxBytes),
+		RequestTimeoutNsec: conf.Genesis.SbftShared.RequestTimeoutNsec}
+	peers := make(map[string][]byte)
+	for addr, cert := range conf.Genesis.SbftShared.Peers {
+		peers[addr], _ = sbftcrypto.ParseCertPEM(cert)
+	}
+	return &sbft.ConsensusConfig{Consensus: &cfg, Peers: peers}
+}
+
+func makeSbftStackConfig(conf *config.TopLevel) *backend.StackConfig {
+	return &backend.StackConfig{ListenAddr: conf.SbftLocal.PeerCommAddr,
+		CertFile: conf.SbftLocal.CertFile,
+		KeyFile:  conf.SbftLocal.KeyFile,
+		DataDir:  conf.SbftLocal.DataDir}
 }

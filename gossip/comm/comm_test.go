@@ -29,7 +29,7 @@ import (
 	"github.com/hyperledger/fabric/gossip/api"
 	"github.com/hyperledger/fabric/gossip/common"
 	"github.com/hyperledger/fabric/gossip/identity"
-	"github.com/hyperledger/fabric/gossip/proto"
+	proto "github.com/hyperledger/fabric/protos/gossip"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
@@ -61,7 +61,7 @@ func (*naiveSecProvider) GetPKIidOfCert(peerIdentity api.PeerIdentityType) commo
 
 // VerifyBlock returns nil if the block is properly signed,
 // else returns error
-func (*naiveSecProvider) VerifyBlock(signedBlock api.SignedBlock) error {
+func (*naiveSecProvider) VerifyBlock(chainID common.ChainID, signedBlock api.SignedBlock) error {
 	return nil
 }
 
@@ -82,6 +82,12 @@ func (*naiveSecProvider) Verify(peerIdentity api.PeerIdentityType, signature, me
 	return nil
 }
 
+// VerifyByChannel verifies a peer's signature on a message in the context
+// of a specific channel
+func (*naiveSecProvider) VerifyByChannel(_ common.ChainID, _ api.PeerIdentityType, _, _ []byte) error {
+	return nil
+}
+
 func newCommInstance(port int, sec api.MessageCryptoService) (Comm, error) {
 	endpoint := fmt.Sprintf("localhost:%d", port)
 	inst, err := NewCommInstanceWithServer(port, identity.NewIdentityMapper(sec), []byte(endpoint))
@@ -89,6 +95,7 @@ func newCommInstance(port int, sec api.MessageCryptoService) (Comm, error) {
 }
 
 func handshaker(endpoint string, comm Comm, t *testing.T, sigMutator func([]byte) []byte, pkiIDmutator func([]byte) []byte) <-chan ReceivedMessage {
+	c := &commImpl{}
 	err := generateCertificates("key.pem", "cert.pem")
 	defer os.Remove("cert.pem")
 	defer os.Remove("key.pem")
@@ -110,22 +117,29 @@ func handshaker(endpoint string, comm Comm, t *testing.T, sigMutator func([]byte
 		return nil
 	}
 	clientCertHash := certHashFromRawCert(cert.Certificate[0])
-	sig, err := naiveSec.Sign(clientCertHash)
-	if sigMutator != nil {
-		sig = sigMutator(sig)
-	}
+
 	pkiID := common.PKIidType(endpoint)
 	if pkiIDmutator != nil {
 		pkiID = common.PKIidType(pkiIDmutator([]byte(endpoint)))
 	}
-
 	assert.NoError(t, err, "%v", err)
-	msg := createConnectionMsg(pkiID, sig, []byte(endpoint))
+	msg := c.createConnectionMsg(pkiID, clientCertHash, []byte(endpoint), func(msg []byte) ([]byte, error) {
+		return msg, nil
+	})
+
+	if sigMutator != nil {
+		msg.Signature = sigMutator(msg.Signature)
+	}
+
 	stream.Send(msg)
 	msg, err = stream.Recv()
 	assert.NoError(t, err, "%v", err)
 	if sigMutator == nil {
-		assert.Equal(t, extractCertificateHashFromContext(stream.Context()), msg.GetConn().Sig)
+		hash := extractCertificateHashFromContext(stream.Context())
+		expectedMsg := c.createConnectionMsg(common.PKIidType("localhost:9611"), hash, []byte("localhost:9611"), func(msg []byte) ([]byte, error) {
+			return msg, nil
+		})
+		assert.Equal(t, expectedMsg.Signature, msg.Signature)
 	}
 	assert.Equal(t, []byte("localhost:9611"), msg.GetConn().PkiID)
 	msg2Send := createGossipMsg()

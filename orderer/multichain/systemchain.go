@@ -17,8 +17,7 @@ limitations under the License.
 package multichain
 
 import (
-	"bytes"
-
+	"github.com/hyperledger/fabric/common/chainconfig"
 	"github.com/hyperledger/fabric/common/configtx"
 	"github.com/hyperledger/fabric/common/policies"
 	"github.com/hyperledger/fabric/orderer/common/filter"
@@ -39,6 +38,7 @@ type limitedSupport interface {
 	ChainID() string
 	PolicyManager() policies.Manager
 	SharedConfig() sharedconfig.Manager
+	ChainConfig() chainconfig.Descriptor
 	Enqueue(env *cb.Envelope) bool
 }
 
@@ -147,27 +147,32 @@ func (sc *systemChain) proposeChain(configTx *cb.Envelope) cb.Status {
 	return cb.Status_SUCCESS
 }
 
-func (sc *systemChain) authorize(configEnvelope *cb.ConfigurationEnvelope) cb.Status {
-	if len(configEnvelope.Items) == 0 {
-		return cb.Status_BAD_REQUEST
-	}
-
-	creationConfigItem := &cb.ConfigurationItem{}
-	err := proto.Unmarshal(configEnvelope.Items[0].ConfigurationItem, creationConfigItem)
+func (sc *systemChain) authorize(configEnvelope *cb.ConfigEnvelope) cb.Status {
+	configNext := &cb.ConfigNext{}
+	err := proto.Unmarshal(configEnvelope.Config, configNext)
 	if err != nil {
 		logger.Debugf("Failing to validate chain creation because of unmarshaling error: %s", err)
 		return cb.Status_BAD_REQUEST
 	}
+	config := configtx.ConfigNextToConfig(configNext)
 
-	if creationConfigItem.Key != configtx.CreationPolicyKey {
-		logger.Debugf("Failing to validate chain creation because first configuration item was not the CreationPolicy")
+	var creationConfigItem *cb.ConfigItem
+	for _, item := range config.Items {
+		if item.Type == cb.ConfigItem_Orderer && item.Key == configtx.CreationPolicyKey {
+			creationConfigItem = item
+			break
+		}
+	}
+
+	if creationConfigItem == nil {
+		logger.Debugf("Failing to validate chain creation because no creation policy included")
 		return cb.Status_BAD_REQUEST
 	}
 
 	creationPolicy := &ab.CreationPolicy{}
 	err = proto.Unmarshal(creationConfigItem.Value, creationPolicy)
 	if err != nil {
-		logger.Debugf("Failing to validate chain creation because first configuration item could not unmarshal to a CreationPolicy: %s", err)
+		logger.Debugf("Failing to validate chain creation because first config item could not unmarshal to a CreationPolicy: %s", err)
 		return cb.Status_BAD_REQUEST
 	}
 
@@ -190,21 +195,23 @@ func (sc *systemChain) authorize(configEnvelope *cb.ConfigurationEnvelope) cb.St
 		return cb.Status_INTERNAL_SERVER_ERROR
 	}
 
-	// XXX actually do policy signature validation
-	_ = policy
-
-	configHash := configtx.HashItems(configEnvelope.Items[1:])
-
-	if !bytes.Equal(configHash, creationPolicy.Digest) {
-		logger.Debugf("Validly signed chain creation did not contain correct digest for remaining configuration %x vs. %x", configHash, creationPolicy.Digest)
+	signedData, err := configEnvelope.AsSignedData()
+	if err != nil {
+		logger.Debugf("Failed to validate chain creation because config envelope could not be converted to signed data: %s", err)
 		return cb.Status_BAD_REQUEST
+	}
+
+	err = policy.Evaluate(signedData)
+	if err != nil {
+		logger.Debugf("Failed to validate chain creation, did not satisfy policy: %s", err)
+		return cb.Status_FORBIDDEN
 	}
 
 	return cb.Status_SUCCESS
 }
 
-func (sc *systemChain) inspect(configTxManager configtx.Manager, policyManager policies.Manager, sharedConfigManager sharedconfig.Manager) cb.Status {
-	// XXX decide what it is that we will require to be the same in the new configuration, and what will be allowed to be different
+func (sc *systemChain) inspect(configResources *configResources) cb.Status {
+	// XXX decide what it is that we will require to be the same in the new config, and what will be allowed to be different
 	// Are all keys allowed? etc.
 
 	return cb.Status_SUCCESS
@@ -219,34 +226,29 @@ func (sc *systemChain) authorizeAndInspect(configTx *cb.Envelope) cb.Status {
 	}
 
 	if payload.Header == nil || payload.Header.ChainHeader == nil || payload.Header.ChainHeader.Type != int32(cb.HeaderType_CONFIGURATION_TRANSACTION) {
-		logger.Debugf("Rejecting chain proposal: Not a configuration transaction: %s", err)
+		logger.Debugf("Rejecting chain proposal: Not a config transaction: %s", err)
 		return cb.Status_BAD_REQUEST
 	}
 
-	configEnvelope := &cb.ConfigurationEnvelope{}
+	configEnvelope := &cb.ConfigEnvelope{}
 	err = proto.Unmarshal(payload.Data, configEnvelope)
 	if err != nil {
 		logger.Debugf("Rejecting chain proposal: Error unmarshalling config envelope from payload: %s", err)
 		return cb.Status_BAD_REQUEST
 	}
 
-	if len(configEnvelope.Items) == 0 {
-		logger.Debugf("Failing to validate chain creation because configuration was empty")
-		return cb.Status_BAD_REQUEST
-	}
-
-	// Make sure that the configuration was signed by the appropriate authorized entities
+	// Make sure that the config was signed by the appropriate authorized entities
 	status := sc.authorize(configEnvelope)
 	if status != cb.Status_SUCCESS {
 		return status
 	}
 
-	configTxManager, policyManager, sharedConfigManager, err := newConfigTxManagerAndHandlers(configEnvelope)
+	configResources, err := newConfigResources(configEnvelope)
 	if err != nil {
 		logger.Debugf("Failed to create config manager and handlers: %s", err)
 		return cb.Status_BAD_REQUEST
 	}
 
-	// Make sure that the configuration does not modify any of the orderer
-	return sc.inspect(configTxManager, policyManager, sharedConfigManager)
+	// Make sure that the config does not modify any of the orderer
+	return sc.inspect(configResources)
 }

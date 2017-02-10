@@ -40,7 +40,18 @@ In the above shell execute the create command
 ```
 CORE_PEER_COMMITTER_LEDGER_ORDERER=orderer:5005 peer channel create -c myc1
 ```
+
 This will create a channel genesis block file `myc1.block` to issue join commands with.
+If you want to specify anchor peers, you can create anchor peer files in the following format:
+peer-hostname
+port
+PEM file of peer certificate
+
+See CORE_PEER_COMMITTER_LEDGER_ORDERER=orderer:5005 peer channel create -h for an anchor-peer file example
+And pass the anchor peer files as a comma-separated argument with flag -a: in example:
+```
+CORE_PEER_COMMITTER_LEDGER_ORDERER=orderer:5005 peer channel create -c myc1 -a anchorPeer1.txt,anchorPeer2.txt
+```
 
 ### Join a channel
 Execute the join command to peer0 in the CLI container.
@@ -92,9 +103,9 @@ peer node start --peer-defaultchain=false
 ```
 
 ```
-"--peer-defaultchain=true" is the default. It allow users continue to work with the default "test_chainid" without having to join a chain.
+"--peer-defaultchain=true" is the default. It allow users continue to work with the default "testchainid" without having to join a chain.
 
-"--peer-defaultchain=false" starts the peer with only the channels that were joined by the peer. If the peer never joined a channel it would start up without any channels. In particular, it does not have the default "test_chainid" support.
+"--peer-defaultchain=false" starts the peer with only the channels that were joined by the peer. If the peer never joined a channel it would start up without any channels. In particular, it does not have the default "testchainid" support.
 
 To join channels, a peer MUST be started with the "--peer-defaultchain=false" option.
 ```

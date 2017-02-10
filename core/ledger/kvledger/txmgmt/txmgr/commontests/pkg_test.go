@@ -19,16 +19,21 @@ package commontests
 import (
 	"testing"
 
+	"github.com/hyperledger/fabric/common/ledger/testutil"
 	"github.com/hyperledger/fabric/core/ledger/kvledger/txmgmt/statedb"
 	"github.com/hyperledger/fabric/core/ledger/kvledger/txmgmt/statedb/statecouchdb"
 	"github.com/hyperledger/fabric/core/ledger/kvledger/txmgmt/statedb/stateleveldb"
 	"github.com/hyperledger/fabric/core/ledger/kvledger/txmgmt/txmgr"
 	"github.com/hyperledger/fabric/core/ledger/kvledger/txmgmt/txmgr/lockbasedtxmgr"
 	"github.com/hyperledger/fabric/core/ledger/ledgerconfig"
-	"github.com/hyperledger/fabric/core/ledger/testutil"
+	ledgertestutil "github.com/hyperledger/fabric/core/ledger/testutil"
 	"github.com/hyperledger/fabric/core/ledger/util"
 	"github.com/hyperledger/fabric/protos/common"
 	"github.com/spf13/viper"
+)
+
+const (
+	testFilesystemPath = "/tmp/fabric/ledgertests/kvledger/txmgmt/txmgr/commontests"
 )
 
 type testEnv interface {
@@ -43,7 +48,7 @@ var testEnvs = []testEnv{}
 
 func init() {
 	//call a helper method to load the core.yaml so that we can detect whether couch is configured
-	testutil.SetupCoreYAMLConfig("./../../../../../../peer")
+	ledgertestutil.SetupCoreYAMLConfig("./../../../../../../peer")
 
 	//Only run the tests if CouchDB is explitily enabled in the code,
 	//otherwise CouchDB may not be installed and all the tests would fail
@@ -68,7 +73,7 @@ func (env *levelDBLockBasedEnv) getName() string {
 }
 
 func (env *levelDBLockBasedEnv) init(t *testing.T) {
-	viper.Set("peer.fileSystemPath", "/tmp/fabric/ledgertests")
+	viper.Set("peer.fileSystemPath", testFilesystemPath)
 	testDBEnv := stateleveldb.NewTestVDBEnv(t)
 	testDB, err := testDBEnv.DBProvider.GetDBHandle("TestDB")
 	testutil.AssertNoError(t, err, "")
@@ -107,7 +112,7 @@ func (env *couchDBLockBasedEnv) getName() string {
 }
 
 func (env *couchDBLockBasedEnv) init(t *testing.T) {
-	viper.Set("peer.fileSystemPath", "/tmp/fabric/ledgertests")
+	viper.Set("peer.fileSystemPath", testFilesystemPath)
 	viper.Set("ledger.state.couchDBConfig.couchDBAddress", "127.0.0.1:5984")
 	testDBEnv := statecouchdb.NewTestVDBEnv(t)
 	testDB, err := testDBEnv.DBProvider.GetDBHandle(couchTestChainID)

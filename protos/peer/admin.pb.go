@@ -29,10 +29,11 @@ It has these top-level messages:
 	ChaincodeMessage
 	PutStateInfo
 	RangeQueryState
-	RangeQueryStateNext
-	RangeQueryStateClose
-	RangeQueryStateKeyValue
-	RangeQueryStateResponse
+	ExecuteQueryState
+	QueryStateNext
+	QueryStateClose
+	QueryStateKeyValue
+	QueryStateResponse
 	ChaincodeEvent
 	AnchorPeers
 	AnchorPeer
@@ -41,10 +42,10 @@ It has these top-level messages:
 	Register
 	Rejection
 	Unregister
+	SignedEvent
 	Event
 	PeerID
 	PeerEndpoint
-	BlockchainInfo
 	SignedProposal
 	Proposal
 	ChaincodeHeaderExtension

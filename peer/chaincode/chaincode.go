@@ -41,23 +41,33 @@ func AddFlags(cmd *cobra.Command) {
 	flags.StringVarP(&chaincodePath, "path", "p", common.UndefinedParamValue,
 		fmt.Sprintf("Path to %s", chainFuncName))
 	flags.StringVarP(&chaincodeName, "name", "n", common.UndefinedParamValue,
-		fmt.Sprint("Name of the chaincode returned by the deploy transaction"))
+		fmt.Sprint("Name of the chaincode"))
+	flags.StringVarP(&chaincodeVersion, "version", "v", common.UndefinedParamValue,
+		fmt.Sprint("Version of the chaincode specified in install/instantiate/upgrade commands"))
 	flags.StringVarP(&chaincodeUsr, "username", "u", common.UndefinedParamValue,
 		fmt.Sprint("Username for chaincode operations when security is enabled"))
 	flags.StringVarP(&customIDGenAlg, "tid", "t", common.UndefinedParamValue,
 		fmt.Sprint("Name of a custom ID generation algorithm (hashing and decoding) e.g. sha256base64"))
 	flags.StringVarP(&chainID, "chainID", "C", util.GetTestChainID(),
 		fmt.Sprint("The chain on which this command should be executed"))
+	flags.StringVarP(&policy, "policy", "P", common.UndefinedParamValue,
+		fmt.Sprint("The endorsement policy associated to this chaincode"))
+	flags.StringVarP(&escc, "escc", "E", common.UndefinedParamValue,
+		fmt.Sprint("The name of the endorsement system chaincode to be used for this chaincode"))
+	flags.StringVarP(&vscc, "vscc", "V", common.UndefinedParamValue,
+		fmt.Sprint("The name of the verification system chaincode to be used for this chaincode"))
 }
 
 // Cmd returns the cobra command for Chaincode
 func Cmd(cf *ChaincodeCmdFactory) *cobra.Command {
 	AddFlags(chaincodeCmd)
 
-	chaincodeCmd.AddCommand(deployCmd(cf))
+	chaincodeCmd.AddCommand(instantiateCmd(cf))
 	chaincodeCmd.AddCommand(invokeCmd(cf))
 	chaincodeCmd.AddCommand(queryCmd(cf))
 	chaincodeCmd.AddCommand(upgradeCmd(cf))
+	chaincodeCmd.AddCommand(packageCmd(cf))
+	chaincodeCmd.AddCommand(installCmd(cf))
 
 	return chaincodeCmd
 }
@@ -73,6 +83,11 @@ var (
 	chaincodeQueryHex bool
 	customIDGenAlg    string
 	chainID           string
+	chaincodeVersion  string
+	policy            string
+	escc              string
+	vscc              string
+	policyMarhsalled  []byte
 )
 
 var chaincodeCmd = &cobra.Command{

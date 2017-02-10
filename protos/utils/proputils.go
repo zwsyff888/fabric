@@ -130,6 +130,17 @@ func GetChaincodeAction(caBytes []byte) (*peer.ChaincodeAction, error) {
 	return chaincodeAction, nil
 }
 
+// GetResponse gets the Response given response bytes
+func GetResponse(resBytes []byte) (*peer.Response, error) {
+	response := &peer.Response{}
+	err := proto.Unmarshal(resBytes, response)
+	if err != nil {
+		return nil, err
+	}
+
+	return response, nil
+}
+
 // GetChaincodeEvents gets the ChaincodeEvents given chaicnode event bytes
 func GetChaincodeEvents(eBytes []byte) (*peer.ChaincodeEvent, error) {
 	chaincodeEvent := &peer.ChaincodeEvent{}
@@ -174,17 +185,6 @@ func GetPayload(e *common.Envelope) (*common.Payload, error) {
 	return payload, nil
 }
 
-// GetConfigurationEnvelope returns a ConfigurationEnvelope from bytes
-func GetConfigurationEnvelope(bytes []byte) (*common.ConfigurationEnvelope, error) {
-	ce := &common.ConfigurationEnvelope{}
-	err := proto.Unmarshal(bytes, ce)
-	if err != nil {
-		return nil, err
-	}
-
-	return ce, nil
-}
-
 // GetTransaction Get Transaction from bytes
 func GetTransaction(txBytes []byte) (*peer.Transaction, error) {
 	tx := &peer.Transaction{}
@@ -227,6 +227,17 @@ func GetSignatureHeader(bytes []byte) (*common.SignatureHeader, error) {
 	}
 
 	return sh, nil
+}
+
+// GetSignaturePolicyEnvelope returns a SignaturePolicyEnvelope from bytes
+func GetSignaturePolicyEnvelope(bytes []byte) (*common.SignaturePolicyEnvelope, error) {
+	p := &common.SignaturePolicyEnvelope{}
+	err := proto.Unmarshal(bytes, p)
+	if err != nil {
+		return nil, err
+	}
+
+	return p, nil
 }
 
 // CreateChaincodeProposal creates a proposal from given input
@@ -274,8 +285,8 @@ func CreateChaincodeProposalWithTransient(txid string, typ common.HeaderType, ch
 }
 
 // GetBytesProposalResponsePayload gets proposal response payload
-func GetBytesProposalResponsePayload(hash []byte, result []byte, event []byte) ([]byte, error) {
-	cAct := &peer.ChaincodeAction{Events: event, Results: result}
+func GetBytesProposalResponsePayload(hash []byte, response *peer.Response, result []byte, event []byte) ([]byte, error) {
+	cAct := &peer.ChaincodeAction{Events: event, Results: result, Response: response}
 	cActBytes, err := proto.Marshal(cAct)
 	if err != nil {
 		return nil, err
@@ -298,6 +309,16 @@ func GetBytesChaincodeProposalPayload(cpp *peer.ChaincodeProposalPayload) ([]byt
 	}
 
 	return cppBytes, nil
+}
+
+// GetBytesResponse gets the bytes of Response
+func GetBytesResponse(res *peer.Response) ([]byte, error) {
+	resBytes, err := proto.Marshal(res)
+	if err != nil {
+		return nil, err
+	}
+
+	return resBytes, nil
 }
 
 // GetBytesChaincodeEvent gets the bytes of ChaincodeEvent
@@ -417,34 +438,42 @@ func CreateProposalFromCIS(txid string, typ common.HeaderType, chainID string, c
 }
 
 // CreateDeployProposalFromCDS returns a deploy proposal given a serialized identity and a ChaincodeDeploymentSpec
-func CreateDeployProposalFromCDS(txid string, chainID string, cds *peer.ChaincodeDeploymentSpec, creator []byte) (*peer.Proposal, error) {
-	return createProposalFromCDS(txid, chainID, cds, creator, true)
+func CreateDeployProposalFromCDS(txid string, chainID string, cds *peer.ChaincodeDeploymentSpec, creator []byte, policy []byte, escc []byte, vscc []byte) (*peer.Proposal, error) {
+	return createProposalFromCDS(txid, chainID, cds, creator, policy, escc, vscc, true)
 }
 
 // CreateUpgradeProposalFromCDS returns a upgrade proposal given a serialized identity and a ChaincodeDeploymentSpec
-func CreateUpgradeProposalFromCDS(txid string, chainID string, cds *peer.ChaincodeDeploymentSpec, creator []byte) (*peer.Proposal, error) {
-	return createProposalFromCDS(txid, chainID, cds, creator, false)
+func CreateUpgradeProposalFromCDS(txid string, chainID string, cds *peer.ChaincodeDeploymentSpec, creator []byte, policy []byte, escc []byte, vscc []byte) (*peer.Proposal, error) {
+	return createProposalFromCDS(txid, chainID, cds, creator, policy, escc, vscc, false)
 }
 
 // createProposalFromCDS returns a deploy or upgrade proposal given a serialized identity and a ChaincodeDeploymentSpec
-func createProposalFromCDS(txid string, chainID string, cds *peer.ChaincodeDeploymentSpec, creator []byte, deploy bool) (*peer.Proposal, error) {
-	b, err := proto.Marshal(cds)
-	if err != nil {
-		return nil, err
-	}
-
+func createProposalFromCDS(txid string, chainID string, cds *peer.ChaincodeDeploymentSpec, creator []byte, policy []byte, escc []byte, vscc []byte, deploy bool) (*peer.Proposal, error) {
 	var propType string
 	if deploy {
 		propType = "deploy"
 	} else {
 		propType = "upgrade"
 	}
+
+	//in the new mode, cds will be nil, "deploy" and "upgrade" are instantiates.
+	var ccinp *peer.ChaincodeInput
+	if cds != nil {
+		b, err := proto.Marshal(cds)
+		if err != nil {
+			return nil, err
+		}
+		ccinp = &peer.ChaincodeInput{Args: [][]byte{[]byte(propType), []byte(chainID), b, policy, escc, vscc}}
+	} else {
+		ccinp = &peer.ChaincodeInput{Args: [][]byte{[]byte(propType), []byte(chainID), nil, policy, escc, vscc}}
+	}
+
 	//wrap the deployment in an invocation spec to lccc...
 	lcccSpec := &peer.ChaincodeInvocationSpec{
 		ChaincodeSpec: &peer.ChaincodeSpec{
 			Type:        peer.ChaincodeSpec_GOLANG,
 			ChaincodeID: &peer.ChaincodeID{Name: "lccc"},
-			Input:       &peer.ChaincodeInput{Args: [][]byte{[]byte(propType), []byte(chainID), b}}}}
+			Input:       ccinp}}
 
 	//...and get the proposal for it
 	return CreateProposalFromCIS(txid, common.HeaderType_ENDORSER_TRANSACTION, chainID, lcccSpec, creator)
