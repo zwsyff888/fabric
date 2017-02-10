@@ -19,6 +19,7 @@ package multichain
 import (
 	"fmt"
 
+	"github.com/hyperledger/fabric/common/configtx"
 	"github.com/hyperledger/fabric/orderer/common/blockcutter"
 	cb "github.com/hyperledger/fabric/protos/common"
 	"github.com/hyperledger/fabric/protos/utils"
@@ -27,20 +28,22 @@ import (
 type mockConsenter struct {
 }
 
-func (mc *mockConsenter) HandleChain(support ConsenterSupport) (Chain, error) {
+func (mc *mockConsenter) HandleChain(support ConsenterSupport, metadata *cb.Metadata) (Chain, error) {
 	return &mockChain{
-		queue:   make(chan *cb.Envelope),
-		cutter:  support.BlockCutter(),
-		support: support,
-		done:    make(chan struct{}),
+		queue:    make(chan *cb.Envelope),
+		cutter:   support.BlockCutter(),
+		support:  support,
+		metadata: metadata,
+		done:     make(chan struct{}),
 	}, nil
 }
 
 type mockChain struct {
-	queue   chan *cb.Envelope
-	support ConsenterSupport
-	cutter  blockcutter.Receiver
-	done    chan struct{}
+	queue    chan *cb.Envelope
+	cutter   blockcutter.Receiver
+	support  ConsenterSupport
+	metadata *cb.Metadata
+	done     chan struct{}
 }
 
 func (mch *mockChain) Enqueue(env *cb.Envelope) bool {
@@ -59,7 +62,7 @@ func (mch *mockChain) Start() {
 			batches, committers, _ := mch.cutter.Ordered(msg)
 			for i, batch := range batches {
 				block := mch.support.CreateNextBlock(batch)
-				mch.support.WriteBlock(block, committers[i])
+				mch.support.WriteBlock(block, committers[i], nil)
 			}
 		}
 	}()
@@ -78,19 +81,19 @@ func (mlw *mockLedgerWriter) Append(blockContents []*cb.Envelope, metadata [][]b
 }
 
 func makeConfigTx(chainID string, i int) *cb.Envelope {
-	return makeConfigTxWithItems(chainID, &cb.ConfigurationItem{
+	configTemplate := configtx.NewSimpleTemplate(&cb.ConfigItem{
+		Type:  cb.ConfigItem_Orderer,
+		Key:   fmt.Sprintf("%d", i),
 		Value: []byte(fmt.Sprintf("%d", i)),
 	})
+	configEnv, err := configTemplate.Envelope(chainID)
+	if err != nil {
+		panic(err)
+	}
+	return makeConfigTxFromConfigEnvelope(chainID, configEnv)
 }
 
-func makeConfigTxWithItems(chainID string, items ...*cb.ConfigurationItem) *cb.Envelope {
-	signedItems := make([]*cb.SignedConfigurationItem, len(items))
-	for i, item := range items {
-		signedItems[i] = &cb.SignedConfigurationItem{
-			ConfigurationItem: utils.MarshalOrPanic(item),
-		}
-	}
-
+func makeConfigTxFromConfigEnvelope(chainID string, configEnv *cb.ConfigEnvelope) *cb.Envelope {
 	payload := &cb.Payload{
 		Header: &cb.Header{
 			ChainHeader: &cb.ChainHeader{
@@ -99,9 +102,7 @@ func makeConfigTxWithItems(chainID string, items ...*cb.ConfigurationItem) *cb.E
 			},
 			SignatureHeader: &cb.SignatureHeader{},
 		},
-		Data: utils.MarshalOrPanic(&cb.ConfigurationEnvelope{
-			Items: signedItems,
-		}),
+		Data: utils.MarshalOrPanic(configEnv),
 	}
 	return &cb.Envelope{
 		Payload: utils.MarshalOrPanic(payload),

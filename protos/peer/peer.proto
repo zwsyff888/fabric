@@ -31,16 +31,6 @@ message PeerEndpoint {
     string address = 2;
 }
 
-// Contains information about the blockchain ledger such as height, current
-// block hash, and previous block hash.
-message BlockchainInfo {
-
-    uint64 height = 1;
-    bytes currentBlockHash = 2;
-    bytes previousBlockHash = 3;
-
-}
-
 //-------- the Endorser service ------------
 
 service Endorser {

@@ -25,7 +25,7 @@ import (
 	"github.com/hyperledger/fabric/peer/common"
 	pb "github.com/hyperledger/fabric/protos/peer"
 	//	"github.com/hyperledger/fabric/protos/utils"
-	"github.com/hyperledger/fabric/core/peer/msp"
+	mspmgmt "github.com/hyperledger/fabric/msp/mgmt"
 )
 
 var once sync.Once
@@ -79,7 +79,7 @@ func TestUpgradeCmd(t *testing.T) {
 	cmd := upgradeCmd(mockCF)
 	AddFlags(cmd)
 
-	args := []string{"-n", "example02", "-p", "github.com/hyperledger/fabric/examples/chaincode/go/chaincode_example02", "-c", "{\"Function\":\"init\",\"Args\": [\"param\",\"1\"]}"}
+	args := []string{"-n", "example02", "-p", "github.com/hyperledger/fabric/examples/chaincode/go/chaincode_example02", "-v", "anotherversion", "-c", "{\"Function\":\"init\",\"Args\": [\"param\",\"1\"]}"}
 	cmd.SetArgs(args)
 
 	if err := cmd.Execute(); err != nil {
@@ -112,7 +112,7 @@ func TestUpgradeCmdEndorseFail(t *testing.T) {
 	cmd := upgradeCmd(mockCF)
 	AddFlags(cmd)
 
-	args := []string{"-n", "example02", "-p", "github.com/hyperledger/fabric/examples/chaincode/go/chaincode_example02", "-c", "{\"Function\":\"init\",\"Args\": [\"param\",\"1\"]}"}
+	args := []string{"-n", "example02", "-p", "github.com/hyperledger/fabric/examples/chaincode/go/chaincode_example02", "-v", "anotherversion", "-c", "{\"Function\":\"init\",\"Args\": [\"param\",\"1\"]}"}
 	cmd.SetArgs(args)
 
 	expectErrMsg := fmt.Sprintf("Could not assemble transaction, err Proposal response was not successful, error code %d, msg %s", errCode, errMsg)
@@ -152,7 +152,7 @@ func TestUpgradeCmdSendTXFail(t *testing.T) {
 	cmd := upgradeCmd(mockCF)
 	AddFlags(cmd)
 
-	args := []string{"-n", "example02", "-p", "github.com/hyperledger/fabric/examples/chaincode/go/chaincode_example02", "-c", "{\"Function\":\"init\",\"Args\": [\"param\",\"1\"]}"}
+	args := []string{"-n", "example02", "-p", "github.com/hyperledger/fabric/examples/chaincode/go/chaincode_example02", "-v", "anotherversion", "-c", "{\"Function\":\"init\",\"Args\": [\"param\",\"1\"]}"}
 	cmd.SetArgs(args)
 
 	expectErrMsg := sendErr.Error()

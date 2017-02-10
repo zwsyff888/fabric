@@ -26,51 +26,101 @@ import (
 	"github.com/hyperledger/fabric/protos/utils"
 
 	"github.com/golang/protobuf/proto"
+	logging "github.com/op/go-logging"
 )
+
+var logger = logging.MustGetLogger("common/configtx/test")
 
 const (
 	// AcceptAllPolicyKey is the key of the AcceptAllPolicy.
 	AcceptAllPolicyKey = "AcceptAllPolicy"
 )
 
-var template configtx.Template
+const (
+	OrdererTemplateName = "orderer.template"
+	MSPTemplateName     = "msp.template"
+	PeerTemplateName    = "peer.template"
+)
+
+var ordererTemplate configtx.Template
+var mspTemplate configtx.Template
+var peerTemplate configtx.Template
+
+var compositeTemplate configtx.Template
 
 var genesisFactory genesis.Factory
 
-// XXX This is a hacky singleton, which should go away, but is an artifact of using the existing utils implementation
-type MSPTemplate struct{}
+func init() {
+	ordererTemplate = readTemplate(OrdererTemplateName)
+	mspTemplate = readTemplate(MSPTemplateName)
+	peerTemplate = readTemplate(PeerTemplateName)
 
-func (msp MSPTemplate) Items(chainID string) ([]*cb.SignedConfigurationItem, error) {
-	return []*cb.SignedConfigurationItem{utils.EncodeMSP(chainID)}, nil
+	compositeTemplate = configtx.NewCompositeTemplate(mspTemplate, ordererTemplate, peerTemplate)
+	genesisFactory = genesis.NewFactoryImpl(compositeTemplate)
 }
 
-func init() {
-
-	gopath := os.Getenv("GOPATH")
-	data, err := ioutil.ReadFile(gopath + "/src/github.com/hyperledger/fabric/common/configtx/test/orderer.template")
-	if err != nil {
-		peerConfig := os.Getenv("PEER_CFG_PATH")
-		data, err = ioutil.ReadFile(peerConfig + "/common/configtx/test/orderer.template")
-		if err != nil {
-			panic(err)
-		}
+func resolveName(name string) (string, []byte) {
+	path := os.Getenv("GOPATH") + "/src/github.com/hyperledger/fabric/common/configtx/test/" + name
+	data, err := ioutil.ReadFile(path)
+	if err == nil {
+		return path, data
 	}
-	templateProto := &cb.ConfigurationTemplate{}
-	err = proto.Unmarshal(data, templateProto)
+
+	path = os.Getenv("PEER_CFG_PATH") + "/common/configtx/test/" + name
+	data, err = ioutil.ReadFile(path)
 	if err != nil {
 		panic(err)
 	}
 
-	template = configtx.NewSimpleTemplate(templateProto.Items...)
-	gossTemplate := configtx.NewSimpleTemplate(utils.EncodeAnchorPeers())
-	genesisFactory = genesis.NewFactoryImpl(configtx.NewCompositeTemplate(MSPTemplate{}, template, gossTemplate))
+	return path, data
 }
 
+func readTemplate(name string) configtx.Template {
+	_, data := resolveName(name)
+
+	templateProto := &cb.ConfigTemplate{}
+	err := proto.Unmarshal(data, templateProto)
+	if err != nil {
+		panic(err)
+	}
+
+	return configtx.NewSimpleTemplate(templateProto.Items...)
+}
+
+// WriteTemplate takes an output file and set of config items and writes them to that file as a marshaled ConfigTemplate
+func WriteTemplate(name string, items ...*cb.ConfigItem) {
+	path, _ := resolveName(name)
+
+	logger.Debugf("Encoding config template")
+	outputData := utils.MarshalOrPanic(&cb.ConfigTemplate{
+		Items: items,
+	})
+
+	logger.Debugf("Writing config to %s", path)
+	ioutil.WriteFile(path, outputData, 0644)
+}
+
+// MakeGenesisBlock creates a genesis block using the test templates for the given chainID
 func MakeGenesisBlock(chainID string) (*cb.Block, error) {
 	return genesisFactory.Block(chainID)
 }
 
-// GetOrderererTemplate returns the test orderer template
-func GetOrdererTemplate() configtx.Template {
-	return template
+// OrderererTemplate returns the test orderer template
+func OrdererTemplate() configtx.Template {
+	return ordererTemplate
+}
+
+// MSPerTemplate returns the test MSP template
+func MSPTemplate() configtx.Template {
+	return mspTemplate
+}
+
+// MSPerTemplate returns the test peer template
+func PeerTemplate() configtx.Template {
+	return peerTemplate
+}
+
+// CompositeTemplate returns the composite template of peer, orderer, and MSP
+func CompositeTemplate() configtx.Template {
+	return compositeTemplate
 }

@@ -48,8 +48,10 @@ PKGNAME = github.com/$(PROJECT_NAME)
 GO_LDFLAGS = -X $(PKGNAME)/common/metadata.Version=$(PROJECT_VERSION)
 CGO_FLAGS = CGO_CFLAGS=" "
 ARCH=$(shell uname -m)
-CHAINTOOL_RELEASE=v0.10.0
+CHAINTOOL_RELEASE=v0.10.1
 BASEIMAGE_RELEASE=$(shell cat ./.baseimage-release)
+
+CHAINTOOL_URL ?= https://github.com/hyperledger/fabric-chaintool/releases/download/$(CHAINTOOL_RELEASE)/chaintool
 
 export GO_LDFLAGS
 
@@ -63,7 +65,7 @@ PROTOS = $(shell git ls-files *.proto | grep -v vendor)
 MSP_SAMPLECONFIG = $(shell git ls-files msp/sampleconfig/*.pem)
 GENESIS_SAMPLECONFIG = $(shell git ls-files common/configtx/test/*.template)
 PROJECT_FILES = $(shell git ls-files)
-IMAGES = peer orderer ccenv javaenv testenv runtime zookeeper kafka
+IMAGES = peer orderer ccenv javaenv testenv zookeeper kafka
 
 pkgmap.peer           := $(PKGNAME)/peer
 pkgmap.orderer        := $(PKGNAME)/orderer
@@ -105,7 +107,7 @@ unit-tests: unit-test
 docker: $(patsubst %,build/image/%/$(DUMMY), $(IMAGES))
 native: peer orderer
 
-BEHAVE_ENVIRONMENTS = kafka orderer-1-kafka-1 orderer-1-kafka-3
+BEHAVE_ENVIRONMENTS = kafka orderer orderer-1-kafka-1 orderer-1-kafka-3
 BEHAVE_ENVIRONMENT_TARGETS = $(patsubst %,bddtests/environments/%, $(BEHAVE_ENVIRONMENTS))
 .PHONY: behave-environments $(BEHAVE_ENVIRONMENT_TARGETS)
 behave-environments: $(BEHAVE_ENVIRONMENT_TARGETS)
@@ -124,7 +126,7 @@ linter: testenv
 %/chaintool: Makefile
 	@echo "Installing chaintool"
 	@mkdir -p $(@D)
-	curl -L https://github.com/hyperledger/fabric-chaintool/releases/download/$(CHAINTOOL_RELEASE)/chaintool > $@
+	curl -L $(CHAINTOOL_URL) > $@
 	chmod +x $@
 
 # We (re)build a package within a docker context but persist the $GOPATH/pkg
@@ -153,18 +155,9 @@ build/docker/gotools: gotools/Makefile
 		hyperledger/fabric-baseimage:$(BASE_DOCKER_TAG) \
 		make install BINDIR=/opt/gotools/bin OBJDIR=/opt/gotools/obj
 
-build/docker/busybox:
-	@$(DRUN) \
-		hyperledger/fabric-baseimage:$(BASE_DOCKER_TAG) \
-		make -f busybox/Makefile install BINDIR=$(@D)
-
 # Both peer and peer-docker depend on ccenv and javaenv (all docker env images it supports).
 build/bin/peer: build/image/ccenv/$(DUMMY) build/image/javaenv/$(DUMMY)
 build/image/peer/$(DUMMY): build/image/ccenv/$(DUMMY) build/image/javaenv/$(DUMMY)
-
-# Both peer-docker and orderer-docker depend on the runtime image
-build/image/peer/$(DUMMY): build/image/runtime/$(DUMMY)
-build/image/orderer/$(DUMMY): build/image/runtime/$(DUMMY)
 
 build/bin/%: $(PROJECT_FILES)
 	@mkdir -p $(@D)
@@ -192,14 +185,17 @@ build/image/testenv/payload:    build/gotools.tar.bz2 \
 				orderer/orderer.yaml \
 				build/docker/bin/peer \
 				peer/core.yaml \
-				build/msp-sampleconfig.tar.bz2
-build/image/runtime/payload:    build/docker/busybox
+				build/msp-sampleconfig.tar.bz2 \
+				images/testenv/install-softhsm2.sh
 build/image/zookeeper/payload:  images/zookeeper/docker-entrypoint.sh
-build/image/kafka/payload:      images/kafka/docker-entrypoint.sh
+build/image/kafka/payload:      images/kafka/docker-entrypoint.sh \
+				images/kafka/kafka-run-class.sh
 
 build/image/%/payload:
 	mkdir -p $@
 	cp $^ $@
+
+.PRECIOUS: build/image/%/Dockerfile
 
 build/image/%/Dockerfile: images/%/Dockerfile.in
 	@cat $< \

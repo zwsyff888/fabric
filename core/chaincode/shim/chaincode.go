@@ -19,14 +19,13 @@ limitations under the License.
 package shim
 
 import (
-	"bytes"
 	"errors"
 	"flag"
 	"fmt"
 	"io"
 	"os"
-	"strconv"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/golang/protobuf/proto"
 	"github.com/golang/protobuf/ptypes/timestamp"
@@ -41,6 +40,11 @@ import (
 
 // Logger for the shim package.
 var chaincodeLogger = logging.MustGetLogger("shim")
+
+const (
+	minUnicodeRuneValue = 0            //U+0000
+	maxUnicodeRuneValue = utf8.MaxRune //U+10FFFF - maximum (and unallocated) code point
+)
 
 // ChaincodeStub is an object passed to chaincode for shim side handling of
 // APIs.
@@ -132,7 +136,6 @@ func SetChaincodeLoggingLevel() {
 // StartInProc is an entry point for system chaincodes bootstrap. It is not an
 // API for chaincodes.
 func StartInProc(env []string, args []string, cc Chaincode, recv <-chan *pb.ChaincodeMessage, send chan<- *pb.ChaincodeMessage) error {
-	logging.SetLevel(logging.DEBUG, "chaincode")
 	chaincodeLogger.Debugf("in proc %v", args)
 
 	var chaincodename string
@@ -274,6 +277,7 @@ func (stub *ChaincodeStub) init(handler *Handler, txid string, input *pb.Chainco
 	stub.proposalContext = proposalContext
 }
 
+// InitTestStub initializes an appropriate stub for testing chaincode
 func InitTestStub(funargs ...string) *ChaincodeStub {
 	stub := ChaincodeStub{}
 	allargs := util.ToChaincodeArgs(funargs...)
@@ -282,6 +286,7 @@ func InitTestStub(funargs ...string) *ChaincodeStub {
 	return &stub
 }
 
+// GetTxID returns the transaction ID
 func (stub *ChaincodeStub) GetTxID() string {
 	return stub.TxID
 }
@@ -294,7 +299,11 @@ func (stub *ChaincodeStub) GetTxID() string {
 // InvokeChaincode locally calls the specified chaincode `Invoke` using the
 // same transaction context; that is, chaincode calling chaincode doesn't
 // create a new transaction message.
-func (stub *ChaincodeStub) InvokeChaincode(chaincodeName string, args [][]byte) ([]byte, error) {
+func (stub *ChaincodeStub) InvokeChaincode(chaincodeName string, args [][]byte, channel string) pb.Response {
+	// Internally we handle chaincode name as a composite name
+	if channel != "" {
+		chaincodeName = chaincodeName + "/" + channel
+	}
 	return stub.handler.handleInvokeChaincode(chaincodeName, args, stub.TxID)
 }
 
@@ -315,12 +324,12 @@ func (stub *ChaincodeStub) DelState(key string) error {
 	return stub.handler.handleDelState(key, stub.TxID)
 }
 
-// StateRangeQueryIterator allows a chaincode to iterate over a range of
+// StateQueryIterator allows a chaincode to iterate over a set of
 // key/value pairs in the state.
-type StateRangeQueryIterator struct {
+type StateQueryIterator struct {
 	handler    *Handler
 	uuid       string
-	response   *pb.RangeQueryStateResponse
+	response   *pb.QueryStateResponse
 	currentLoc int
 }
 
@@ -329,28 +338,75 @@ type StateRangeQueryIterator struct {
 // an iterator will be returned that can be used to iterate over all keys
 // between the startKey and endKey, inclusive. The order in which keys are
 // returned by the iterator is random.
-func (stub *ChaincodeStub) RangeQueryState(startKey, endKey string) (StateRangeQueryIteratorInterface, error) {
+func (stub *ChaincodeStub) RangeQueryState(startKey, endKey string) (StateQueryIteratorInterface, error) {
 	response, err := stub.handler.handleRangeQueryState(startKey, endKey, stub.TxID)
 	if err != nil {
 		return nil, err
 	}
-	return &StateRangeQueryIterator{stub.handler, stub.TxID, response, 0}, nil
+	return &StateQueryIterator{stub.handler, stub.TxID, response, 0}, nil
 }
 
-//Given a list of attributes, createCompositeKey function combines these attributes
-//to form a composite key.
-func (stub *ChaincodeStub) CreateCompositeKey(objectType string, attributes []string) (string, error) {
-	return createCompositeKey(stub, objectType, attributes)
-}
-
-func createCompositeKey(stub ChaincodeStubInterface, objectType string, attributes []string) (string, error) {
-	var compositeKey bytes.Buffer
-	compositeKey.WriteString(objectType)
-	for _, attribute := range attributes {
-		compositeKey.WriteString(strconv.Itoa(len(attribute)))
-		compositeKey.WriteString(attribute)
+// GetQueryResult function can be invoked by a chaincode to perform a
+// rich query against state database.  Only supported by state database implementations
+// that support rich query.  The query string is in the syntax of the underlying
+// state database. An iterator is returned which can be used to iterate (next) over
+// the query result set
+func (stub *ChaincodeStub) GetQueryResult(query string) (StateQueryIteratorInterface, error) {
+	response, err := stub.handler.handleExecuteQueryState(query, stub.TxID)
+	if err != nil {
+		return nil, err
 	}
-	return compositeKey.String(), nil
+	return &StateQueryIterator{stub.handler, stub.TxID, response, 0}, nil
+
+}
+
+//CreateCompositeKey combines the given attributes to form a composite key.
+func (stub *ChaincodeStub) CreateCompositeKey(objectType string, attributes []string) (string, error) {
+	return createCompositeKey(objectType, attributes)
+}
+
+//SplitCompositeKey splits the key into attributes on which the composite key was formed.
+func (stub *ChaincodeStub) SplitCompositeKey(compositeKey string) (string, []string, error) {
+	return splitCompositeKey(compositeKey)
+}
+
+func createCompositeKey(objectType string, attributes []string) (string, error) {
+	if err := validateCompositeKeyAttribute(objectType); err != nil {
+		return "", err
+	}
+	ck := objectType + string(minUnicodeRuneValue)
+	for _, att := range attributes {
+		if err := validateCompositeKeyAttribute(att); err != nil {
+			return "", err
+		}
+		ck += att + string(minUnicodeRuneValue)
+	}
+	return ck, nil
+}
+
+func splitCompositeKey(compositeKey string) (string, []string, error) {
+	componentIndex := 0
+	components := []string{}
+	for i := 0; i < len(compositeKey); i++ {
+		if compositeKey[i] == minUnicodeRuneValue {
+			components = append(components, compositeKey[componentIndex:i])
+			componentIndex = i + 1
+		}
+	}
+	return components[0], components[1:], nil
+}
+
+func validateCompositeKeyAttribute(str string) error {
+	if !utf8.ValidString(str) {
+		return fmt.Errorf("Not a valid utf8 string: [%x]", str)
+	}
+	for index, runeValue := range str {
+		if runeValue == minUnicodeRuneValue || runeValue == maxUnicodeRuneValue {
+			return fmt.Errorf(`Input contain unicode %#U starting at position [%d]. %#U and %#U are not allowed in the input attribute of a composite key`,
+				runeValue, index, minUnicodeRuneValue, maxUnicodeRuneValue)
+		}
+	}
+	return nil
 }
 
 //PartialCompositeKeyQuery function can be invoked by a chaincode to query the
@@ -359,13 +415,13 @@ func createCompositeKey(stub ChaincodeStubInterface, objectType string, attribut
 //matches the given partial composite key. This function should be used only for
 //a partial composite key. For a full composite key, an iter with empty response
 //would be returned.
-func (stub *ChaincodeStub) PartialCompositeKeyQuery(objectType string, attributes []string) (StateRangeQueryIteratorInterface, error) {
+func (stub *ChaincodeStub) PartialCompositeKeyQuery(objectType string, attributes []string) (StateQueryIteratorInterface, error) {
 	return partialCompositeKeyQuery(stub, objectType, attributes)
 }
 
-func partialCompositeKeyQuery(stub ChaincodeStubInterface, objectType string, attributes []string) (StateRangeQueryIteratorInterface, error) {
+func partialCompositeKeyQuery(stub ChaincodeStubInterface, objectType string, attributes []string) (StateQueryIteratorInterface, error) {
 	partialCompositeKey, _ := stub.CreateCompositeKey(objectType, attributes)
-	keysIter, err := stub.RangeQueryState(partialCompositeKey+"1", partialCompositeKey+":")
+	keysIter, err := stub.RangeQueryState(partialCompositeKey, partialCompositeKey+string(maxUnicodeRuneValue))
 	if err != nil {
 		return nil, fmt.Errorf("Error fetching rows: %s", err)
 	}
@@ -374,7 +430,7 @@ func partialCompositeKeyQuery(stub ChaincodeStubInterface, objectType string, at
 
 // HasNext returns true if the range query iterator contains additional keys
 // and values.
-func (iter *StateRangeQueryIterator) HasNext() bool {
+func (iter *StateQueryIterator) HasNext() bool {
 	if iter.currentLoc < len(iter.response.KeysAndValues) || iter.response.HasMore {
 		return true
 	}
@@ -382,7 +438,7 @@ func (iter *StateRangeQueryIterator) HasNext() bool {
 }
 
 // Next returns the next key and value in the range query iterator.
-func (iter *StateRangeQueryIterator) Next() (string, []byte, error) {
+func (iter *StateQueryIterator) Next() (string, []byte, error) {
 	if iter.currentLoc < len(iter.response.KeysAndValues) {
 		keyValue := iter.response.KeysAndValues[iter.currentLoc]
 		iter.currentLoc++
@@ -390,7 +446,7 @@ func (iter *StateRangeQueryIterator) Next() (string, []byte, error) {
 	} else if !iter.response.HasMore {
 		return "", nil, errors.New("No such key")
 	} else {
-		response, err := iter.handler.handleRangeQueryStateNext(iter.response.ID, iter.uuid)
+		response, err := iter.handler.handleQueryStateNext(iter.response.ID, iter.uuid)
 
 		if err != nil {
 			return "", nil, err
@@ -407,15 +463,17 @@ func (iter *StateRangeQueryIterator) Next() (string, []byte, error) {
 
 // Close closes the range query iterator. This should be called when done
 // reading from the iterator to free up resources.
-func (iter *StateRangeQueryIterator) Close() error {
-	_, err := iter.handler.handleRangeQueryStateClose(iter.response.ID, iter.uuid)
+func (iter *StateQueryIterator) Close() error {
+	_, err := iter.handler.handleQueryStateClose(iter.response.ID, iter.uuid)
 	return err
 }
 
+// GetArgs returns the argument list
 func (stub *ChaincodeStub) GetArgs() [][]byte {
 	return stub.args
 }
 
+// GetStringArgs returns the arguments as array of strings
 func (stub *ChaincodeStub) GetStringArgs() []string {
 	args := stub.GetArgs()
 	strargs := make([]string, 0, len(args))
@@ -425,6 +483,8 @@ func (stub *ChaincodeStub) GetStringArgs() []string {
 	return strargs
 }
 
+// GetFunctionAndParameters returns the first arg as the function and the rest
+// as argument string array
 func (stub *ChaincodeStub) GetFunctionAndParameters() (function string, params []string) {
 	allargs := stub.GetStringArgs()
 	function = ""

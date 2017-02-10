@@ -20,19 +20,16 @@ import (
 	"errors"
 	"fmt"
 
+	commonledger "github.com/hyperledger/fabric/common/ledger"
+	"github.com/hyperledger/fabric/common/ledger/blkstorage"
 	"github.com/hyperledger/fabric/core/ledger"
-	"github.com/hyperledger/fabric/core/ledger/blkstorage"
-	"github.com/hyperledger/fabric/core/ledger/kvledger/history/histmgr"
-	"github.com/hyperledger/fabric/core/ledger/kvledger/history/histmgr/couchdbhistmgr"
+	"github.com/hyperledger/fabric/core/ledger/kvledger/history/historydb"
 	"github.com/hyperledger/fabric/core/ledger/kvledger/txmgmt/statedb"
 	"github.com/hyperledger/fabric/core/ledger/kvledger/txmgmt/txmgr"
 	"github.com/hyperledger/fabric/core/ledger/kvledger/txmgmt/txmgr/lockbasedtxmgr"
 	"github.com/hyperledger/fabric/core/ledger/ledgerconfig"
-
-	logging "github.com/op/go-logging"
-
 	"github.com/hyperledger/fabric/protos/common"
-	pb "github.com/hyperledger/fabric/protos/peer"
+	logging "github.com/op/go-logging"
 )
 
 var logger = logging.MustGetLogger("kvledger")
@@ -40,34 +37,25 @@ var logger = logging.MustGetLogger("kvledger")
 // KVLedger provides an implementation of `ledger.PeerLedger`.
 // This implementation provides a key-value based data model
 type kvLedger struct {
-	ledgerID    string
-	blockStore  blkstorage.BlockStore
-	txtmgmt     txmgr.TxMgr
-	historymgmt histmgr.HistMgr
+	ledgerID   string
+	blockStore blkstorage.BlockStore
+	txtmgmt    txmgr.TxMgr
+	historyDB  historydb.HistoryDB
 }
 
 // NewKVLedger constructs new `KVLedger`
-func newKVLedger(ledgerID string, blockStore blkstorage.BlockStore, versionedDB statedb.VersionedDB) (*kvLedger, error) {
-	logger.Debugf("Creating KVLedger ledgerID=%s: ", ledgerID)
-	//State and History database managers
-	var txmgmt txmgr.TxMgr
-	var historymgmt histmgr.HistMgr
+func newKVLedger(ledgerID string, blockStore blkstorage.BlockStore,
+	versionedDB statedb.VersionedDB, historyDB historydb.HistoryDB) (*kvLedger, error) {
 
+	logger.Debugf("Creating KVLedger ledgerID=%s: ", ledgerID)
+
+	//Initialize transaction manager using state database
+	var txmgmt txmgr.TxMgr
 	txmgmt = lockbasedtxmgr.NewLockBasedTxMgr(versionedDB)
 
-	if ledgerconfig.IsHistoryDBEnabled() == true {
-		logger.Debugf("===HISTORYDB=== NewKVLedger() Using CouchDB for transaction history database")
-
-		couchDBDef := ledgerconfig.GetCouchDBDefinition()
-
-		historymgmt = couchdbhistmgr.NewCouchDBHistMgr(
-			couchDBDef.URL,      //couchDB connection URL
-			"system_history",    //couchDB db name matches ledger name, TODO for now use system_history ledger, eventually allow passing in subledger name
-			couchDBDef.Username, //enter couchDB id here
-			couchDBDef.Password) //enter couchDB pw here
-	}
-
-	l := &kvLedger{ledgerID, blockStore, txmgmt, historymgmt}
+	// Create a kvLedger for this chain/ledger, which encasulates the underlying
+	// id store, blockstore, txmgr (state database), history database
+	l := &kvLedger{ledgerID, blockStore, txmgmt, historyDB}
 
 	//Recover both state DB and history DB if they are out of sync with block storage
 	if err := recoverDB(l); err != nil {
@@ -80,10 +68,11 @@ func newKVLedger(ledgerID string, blockStore blkstorage.BlockStore, versionedDB 
 //Recover the state database and history database (if exist)
 //by recommitting last valid blocks
 func recoverDB(l *kvLedger) error {
+	logger.Debugf("Entering recoverDB()")
 	//If there is no block in blockstorage, nothing to recover.
 	info, _ := l.blockStore.GetBlockchainInfo()
 	if info.Height == 0 {
-		logger.Debugf("Block storage is empty.")
+		logger.Debug("Block storage is empty.")
 		return nil
 	}
 
@@ -102,9 +91,9 @@ func recoverDB(l *kvLedger) error {
 		return err
 	}
 
-	if ledgerconfig.IsHistoryDBEnabled() == true {
+	if ledgerconfig.IsHistoryDBEnabled() {
 		//Getting savepointValue stored in the history DB
-		if historyDBSavepoint, err = l.historymgmt.GetBlockNumFromSavepoint(); err != nil {
+		if historyDBSavepoint, err = l.historyDB.GetBlockNumFromSavepoint(); err != nil {
 			return err
 		}
 		//Check whether the history DB is in sync with block storage
@@ -113,53 +102,53 @@ func recoverDB(l *kvLedger) error {
 		}
 	}
 
-	if recoverHistoryDB == false && recoverStateDB == false {
+	if !recoverHistoryDB && !recoverStateDB {
 		//If nothing needs recovery, return
-		if ledgerconfig.IsHistoryDBEnabled() == true {
-			logger.Debugf("Both state database and history database are in sync with the block storage. No need to perform recovery operation.")
+		if ledgerconfig.IsHistoryDBEnabled() {
+			logger.Debug("Both state database and history database are in sync with the block storage. No need to perform recovery operation.")
 		} else {
-			logger.Debugf("State database is in sync with the block storage.")
+			logger.Debug("State database is in sync with the block storage.")
 		}
 		return nil
-	} else if recoverHistoryDB == false && recoverStateDB == true {
+	} else if !recoverHistoryDB && recoverStateDB {
 		logger.Debugf("State database is behind block storage by %d blocks. Recovering state database.", info.Height-stateDBSavepoint)
-		if err = recommitLostBlocks(l, stateDBSavepoint, info.Height, true, false); err != nil {
+		if err = recommitLostBlocks(l, stateDBSavepoint, info.Height, recoverStateDB, recoverHistoryDB); err != nil {
 			return err
 		}
-	} else if recoverHistoryDB == true && recoverStateDB == false {
+	} else if recoverHistoryDB && !recoverStateDB {
 		logger.Debugf("History database is behind block storage by %d blocks. Recovering history database.", info.Height-historyDBSavepoint)
-		if err = recommitLostBlocks(l, historyDBSavepoint, info.Height, false, true); err != nil {
+		if err = recommitLostBlocks(l, historyDBSavepoint, info.Height, recoverStateDB, recoverHistoryDB); err != nil {
 			return err
 		}
-	} else if recoverHistoryDB == true && recoverStateDB == true {
+	} else if recoverHistoryDB && recoverStateDB {
 		logger.Debugf("State database is behind block storage by %d blocks, and history database is behind block storage by %d blocks. Recovering both state and history database.", info.Height-stateDBSavepoint, info.Height-historyDBSavepoint)
 		//If both state DB and history DB need to be recovered, first
 		//we need to ensure that the state DB and history DB are in same state
 		//before recommitting lost blocks.
 		if stateDBSavepoint > historyDBSavepoint {
 			logger.Debugf("History database is behind the state database by %d blocks", stateDBSavepoint-historyDBSavepoint)
-			logger.Debugf("Making the history DB in sync with state DB")
-			if err = recommitLostBlocks(l, historyDBSavepoint, stateDBSavepoint, false, true); err != nil {
+			logger.Debug("Making the history DB in sync with state DB")
+			if err = recommitLostBlocks(l, historyDBSavepoint, stateDBSavepoint, !recoverStateDB, recoverHistoryDB); err != nil {
 				return err
 			}
-			logger.Debugf("Making both history DB and state DB in sync with the block storage")
-			if err = recommitLostBlocks(l, stateDBSavepoint, info.Height, true, true); err != nil {
+			logger.Debug("Making both history DB and state DB in sync with the block storage")
+			if err = recommitLostBlocks(l, stateDBSavepoint, info.Height, recoverStateDB, recoverHistoryDB); err != nil {
 				return err
 			}
 		} else if stateDBSavepoint < historyDBSavepoint {
 			logger.Debugf("State database is behind the history database by %d blocks", historyDBSavepoint-stateDBSavepoint)
-			logger.Debugf("Making the state DB in sync with history DB")
-			if err = recommitLostBlocks(l, stateDBSavepoint, historyDBSavepoint, true, false); err != nil {
+			logger.Debug("Making the state DB in sync with history DB")
+			if err = recommitLostBlocks(l, stateDBSavepoint, historyDBSavepoint, recoverStateDB, !recoverHistoryDB); err != nil {
 				return err
 			}
-			logger.Debugf("Making both state DB and history DB in sync with the block storage")
-			if err = recommitLostBlocks(l, historyDBSavepoint, info.Height, true, true); err != nil {
+			logger.Debug("Making both state DB and history DB in sync with the block storage")
+			if err = recommitLostBlocks(l, historyDBSavepoint, info.Height, recoverStateDB, recoverHistoryDB); err != nil {
 				return err
 			}
 		} else {
-			logger.Debugf("State and history database are in same state but behind block storage")
-			logger.Debugf("Making both state DB and history DB in sync with the block storage")
-			if err = recommitLostBlocks(l, stateDBSavepoint, info.Height, true, true); err != nil {
+			logger.Debug("State and history database are in same state but behind block storage")
+			logger.Debug("Making both state DB and history DB in sync with the block storage")
+			if err = recommitLostBlocks(l, stateDBSavepoint, info.Height, recoverStateDB, recoverHistoryDB); err != nil {
 				return err
 			}
 		}
@@ -189,7 +178,7 @@ func recommitLostBlocks(l *kvLedger, savepoint uint64, blockHeight uint64, recov
 		if block, err = l.GetBlockByNumber(blockNumber); err != nil {
 			return err
 		}
-		if recoverStateDB == true {
+		if recoverStateDB {
 			logger.Debugf("Constructing updateSet for the block %d", blockNumber)
 			if err = l.txtmgmt.ValidateAndPrepare(block, false); err != nil {
 				return err
@@ -199,8 +188,8 @@ func recommitLostBlocks(l *kvLedger, savepoint uint64, blockHeight uint64, recov
 				return err
 			}
 		}
-		if ledgerconfig.IsHistoryDBEnabled() == true && recoverHistoryDB == true {
-			if err = l.historymgmt.Commit(block); err != nil {
+		if ledgerconfig.IsHistoryDBEnabled() && recoverHistoryDB {
+			if err = l.historyDB.Commit(block); err != nil {
 				return err
 			}
 		}
@@ -210,12 +199,12 @@ func recommitLostBlocks(l *kvLedger, savepoint uint64, blockHeight uint64, recov
 }
 
 // GetTransactionByID retrieves a transaction by id
-func (l *kvLedger) GetTransactionByID(txID string) (*pb.Transaction, error) {
+func (l *kvLedger) GetTransactionByID(txID string) (*common.Envelope, error) {
 	return l.blockStore.RetrieveTxByID(txID)
 }
 
 // GetBlockchainInfo returns basic info about blockchain
-func (l *kvLedger) GetBlockchainInfo() (*pb.BlockchainInfo, error) {
+func (l *kvLedger) GetBlockchainInfo() (*common.BlockchainInfo, error) {
 	return l.blockStore.GetBlockchainInfo()
 }
 
@@ -229,7 +218,7 @@ func (l *kvLedger) GetBlockByNumber(blockNumber uint64) (*common.Block, error) {
 // GetBlocksIterator returns an iterator that starts from `startBlockNumber`(inclusive).
 // The iterator is a blocking iterator i.e., it blocks till the next block gets available in the ledger
 // ResultsIterator contains type BlockHolder
-func (l *kvLedger) GetBlocksIterator(startBlockNumber uint64) (ledger.ResultsIterator, error) {
+func (l *kvLedger) GetBlocksIterator(startBlockNumber uint64) (commonledger.ResultsIterator, error) {
 	return l.blockStore.RetrieveBlocks(startBlockNumber)
 
 }
@@ -240,7 +229,7 @@ func (l *kvLedger) GetBlockByHash(blockHash []byte) (*common.Block, error) {
 }
 
 //Prune prunes the blocks/transactions that satisfy the given policy
-func (l *kvLedger) Prune(policy ledger.PrunePolicy) error {
+func (l *kvLedger) Prune(policy commonledger.PrunePolicy) error {
 	return errors.New("Not yet implemented")
 }
 
@@ -259,38 +248,37 @@ func (l *kvLedger) NewQueryExecutor() (ledger.QueryExecutor, error) {
 // NewHistoryQueryExecutor gives handle to a history query executor.
 // A client can obtain more than one 'HistoryQueryExecutor's for parallel execution.
 // Any synchronization should be performed at the implementation level if required
+// Pass the ledger blockstore so that historical values can be looked up from the chain
 func (l *kvLedger) NewHistoryQueryExecutor() (ledger.HistoryQueryExecutor, error) {
-	return l.historymgmt.NewHistoryQueryExecutor()
+	return l.historyDB.NewHistoryQueryExecutor(l.blockStore)
 }
 
 // Commit commits the valid block (returned in the method RemoveInvalidTransactionsAndPrepare) and related state changes
 func (l *kvLedger) Commit(block *common.Block) error {
 	var err error
+	blockNo := block.Header.Number
 
-	logger.Debugf("Validating block")
+	logger.Debugf("Validating block [%d]", blockNo)
 	err = l.txtmgmt.ValidateAndPrepare(block, true)
 	if err != nil {
 		return err
 	}
 
-	logger.Debugf("Committing block to storage")
+	logger.Debugf("Committing block [%d] to storage", blockNo)
 	if err = l.blockStore.AddBlock(block); err != nil {
 		return err
 	}
 
-	logger.Debugf("Committing block to state database")
+	logger.Debugf("Committing block [%d] transactions to state database", blockNo)
 	if err = l.txtmgmt.Commit(); err != nil {
 		panic(fmt.Errorf(`Error during commit to txmgr:%s`, err))
 	}
 
-	//TODO There are still some decisions to be made regarding how consistent history
-	//needs to stay with the state.  At min will want this to run async with state db writes.
-	//(History needs to wait for the block (FSBlock) to write but not the state db)
-	logger.Debugf("===HISTORYDB=== Commit() will write to history if enabled else will be by-passed if not enabled: vledgerconfig.IsHistoryDBEnabled(): %v\n", ledgerconfig.IsHistoryDBEnabled())
-	if ledgerconfig.IsHistoryDBEnabled() == true {
-		logger.Debugf("Committing transactions to history database")
-		if err := l.historymgmt.Commit(block); err != nil {
-			panic(fmt.Errorf(`Error during commit to txthistory:%s`, err))
+	// History database could be written in parallel with state and/or async as a future optimization
+	if ledgerconfig.IsHistoryDBEnabled() {
+		logger.Debugf("Committing block [%d] transactions to history database", blockNo)
+		if err := l.historyDB.Commit(block); err != nil {
+			panic(fmt.Errorf(`Error during commit to history db:%s`, err))
 		}
 	}
 

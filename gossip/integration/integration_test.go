@@ -19,14 +19,18 @@ package integration
 import (
 	"fmt"
 	"net"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/hyperledger/fabric/msp/mgmt"
+	"github.com/spf13/viper"
 	"google.golang.org/grpc"
 )
 
 // This is just a test that shows how to instantiate a gossip component
 func TestNewGossipCryptoService(t *testing.T) {
+	setupTestEnv()
 	s1 := grpc.NewServer()
 	s2 := grpc.NewServer()
 	s3 := grpc.NewServer()
@@ -39,9 +43,12 @@ func TestNewGossipCryptoService(t *testing.T) {
 	endpoint2 := "localhost:5612"
 	endpoint3 := "localhost:5613"
 
-	g1 := NewGossipComponent(endpoint1, s1, []grpc.DialOption{grpc.WithInsecure()})
-	g2 := NewGossipComponent(endpoint2, s2, []grpc.DialOption{grpc.WithInsecure()}, endpoint1)
-	g3 := NewGossipComponent(endpoint3, s3, []grpc.DialOption{grpc.WithInsecure()}, endpoint1)
+	mgmt.LoadFakeSetupWithLocalMspAndTestChainMsp("../../msp/sampleconfig")
+	identity, _ := mgmt.GetLocalSigningIdentityOrPanic().Serialize()
+
+	g1 := NewGossipComponent(identity, endpoint1, s1, []grpc.DialOption{grpc.WithInsecure()})
+	g2 := NewGossipComponent(identity, endpoint2, s2, []grpc.DialOption{grpc.WithInsecure()}, endpoint1)
+	g3 := NewGossipComponent(identity, endpoint3, s3, []grpc.DialOption{grpc.WithInsecure()}, endpoint1)
 	go s1.Serve(ll1)
 	go s2.Serve(ll2)
 	go s3.Serve(ll3)
@@ -51,4 +58,16 @@ func TestNewGossipCryptoService(t *testing.T) {
 	fmt.Println(g2.Peers())
 	fmt.Println(g3.Peers())
 	time.Sleep(time.Second)
+}
+
+func setupTestEnv() {
+	viper.SetConfigName("core")
+	viper.SetEnvPrefix("CORE")
+	viper.AddConfigPath("./../../peer")
+	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
+	viper.AutomaticEnv()
+	err := viper.ReadInConfig()
+	if err != nil { // Handle errors reading the config file
+		panic(fmt.Errorf("Fatal error config file: %s \n", err))
+	}
 }

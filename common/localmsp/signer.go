@@ -19,16 +19,16 @@ package localmsp
 import (
 	"fmt"
 
-	"github.com/hyperledger/fabric/core/crypto/primitives"
 	"github.com/hyperledger/fabric/common/crypto"
+	"github.com/hyperledger/fabric/core/crypto/primitives"
+	mspmgmt "github.com/hyperledger/fabric/msp/mgmt"
 	cb "github.com/hyperledger/fabric/protos/common"
-	"github.com/hyperledger/fabric/core/peer/msp"
 )
 
 type mspSigner struct {
 }
 
-// New returns a new instance of the msp-based LocalSigner.
+// NewSigner returns a new instance of the msp-based LocalSigner.
 // It assumes that the local msp has been already initialized.
 // Look at mspmgmt.LoadLocalMsp for further information.
 func NewSigner() crypto.LocalSigner {

@@ -25,6 +25,7 @@ import (
 	"time"
 
 	pb "github.com/golang/protobuf/proto"
+	"github.com/hyperledger/fabric/common/configtx/test"
 	"github.com/hyperledger/fabric/common/util"
 	"github.com/hyperledger/fabric/core/committer"
 	"github.com/hyperledger/fabric/core/ledger/ledgermgmt"
@@ -33,19 +34,19 @@ import (
 	"github.com/hyperledger/fabric/gossip/comm"
 	"github.com/hyperledger/fabric/gossip/common"
 	"github.com/hyperledger/fabric/gossip/gossip"
-	"github.com/hyperledger/fabric/gossip/proto"
+	gossipUtil "github.com/hyperledger/fabric/gossip/util"
 	pcomm "github.com/hyperledger/fabric/protos/common"
-	"github.com/op/go-logging"
+	proto "github.com/hyperledger/fabric/protos/gossip"
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 )
 
 var (
 	portPrefix = 5610
-	logger, _  = logging.GetLogger("GossipStateProviderTest")
+	logger     = gossipUtil.GetLogger(gossipUtil.LoggingStateModule, "")
 )
 
-var orgId = []byte("ORG1")
+var orgID = []byte("ORG1")
 var anchorPeerIdentity = api.PeerIdentityType("identityInOrg1")
 
 type joinChanMsg struct {
@@ -68,7 +69,7 @@ type orgCryptoService struct {
 // OrgByPeerIdentity returns the OrgIdentityType
 // of a given peer identity
 func (*orgCryptoService) OrgByPeerIdentity(identity api.PeerIdentityType) api.OrgIdentityType {
-	return orgId
+	return orgID
 }
 
 // Verify verifies a JoinChannelMessage, returns nil on success,
@@ -87,7 +88,7 @@ func (*naiveCryptoService) GetPKIidOfCert(peerIdentity api.PeerIdentityType) com
 
 // VerifyBlock returns nil if the block is properly signed,
 // else returns error
-func (*naiveCryptoService) VerifyBlock(signedBlock api.SignedBlock) error {
+func (*naiveCryptoService) VerifyBlock(chainID common.ChainID, signedBlock api.SignedBlock) error {
 	return nil
 }
 
@@ -108,6 +109,14 @@ func (*naiveCryptoService) Verify(peerIdentity api.PeerIdentityType, signature, 
 	return nil
 }
 
+// VerifyByChannel checks that signature is a valid signature of message
+// under a peer's verification key, but also in the context of a specific channel.
+// If the verification succeeded, Verify returns nil meaning no error occurred.
+// If peerIdentity is nil, then the signature is verified against this peer's verification key.
+func (*naiveCryptoService) VerifyByChannel(chainID common.ChainID, peerIdentity api.PeerIdentityType, signature, message []byte) error {
+	return nil
+}
+
 func (*naiveCryptoService) ValidateIdentity(peerIdentity api.PeerIdentityType) error {
 	return nil
 }
@@ -115,7 +124,7 @@ func (*naiveCryptoService) ValidateIdentity(peerIdentity api.PeerIdentityType) e
 func bootPeers(ids ...int) []string {
 	peers := []string{}
 	for _, id := range ids {
-		peers = append(peers, fmt.Sprintf("localhost:%d", (id+portPrefix)))
+		peers = append(peers, fmt.Sprintf("localhost:%d", id+portPrefix))
 	}
 	return peers
 }
@@ -164,6 +173,8 @@ func newGossipInstance(config *gossip.Config) gossip.Gossip {
 // Create new instance of KVLedger to be used for testing
 func newCommitter(id int) committer.Committer {
 	ledger, _ := ledgermgmt.CreateLedger(strconv.Itoa(id))
+	cb, _ := test.MakeGenesisBlock(util.GetTestChainID())
+	ledger.Commit(cb)
 	return committer.NewLedgerCommitter(ledger, &validator.MockValidator{})
 }
 
@@ -286,7 +297,7 @@ func TestNewGossipStateProvider_SendingManyMessages(t *testing.T) {
 
 	msgCount := 10
 
-	for i := 0; i < msgCount; i++ {
+	for i := 1; i <= msgCount; i++ {
 		rawblock := pcomm.NewBlock(uint64(i), []byte{})
 		if bytes, err := pb.Marshal(rawblock); err == nil {
 			payload := &proto.Payload{uint64(i), "", bytes}
@@ -313,25 +324,24 @@ func TestNewGossipStateProvider_SendingManyMessages(t *testing.T) {
 	waitUntilTrueOrTimeout(t, func() bool {
 		for _, p := range peersSet {
 			if len(p.g.PeersOfChannel(common.ChainID(util.GetTestChainID()))) != bootstrapSetSize+standartPeersSize-1 {
-				logger.Debug("[XXXXXXX]: Peer discovery has not finished yet")
+				logger.Debug("Peer discovery has not finished yet")
 				return false
 			}
 		}
-		logger.Debug("[AAAAAA]: All peer discovered each other!!!")
+		logger.Debug("All peer discovered each other!!!")
 		return true
 	}, 30*time.Second)
 
-	logger.Debug("[!!!!!]: Waiting for all blocks to arrive.")
+	logger.Debug("Waiting for all blocks to arrive.")
 	waitUntilTrueOrTimeout(t, func() bool {
-		logger.Debug("[*****]: Trying to see all peers get all blocks")
+		logger.Debug("Trying to see all peers get all blocks")
 		for _, p := range peersSet {
 			height, err := p.commit.LedgerHeight()
-			if height != uint64(msgCount) || err != nil {
-				logger.Debug("[XXXXXXX]: Ledger height is at: ", height)
+			if height != uint64(msgCount+1) || err != nil {
 				return false
 			}
 		}
-		logger.Debug("[#####]: All peers have same ledger height!!!")
+		logger.Debug("All peers have same ledger height!!!")
 		return true
 	}, 60*time.Second)
 }
@@ -390,7 +400,7 @@ func TestGossipStateProvider_TestStateMessages(t *testing.T) {
 	select {
 	case <-readyCh:
 		{
-			logger.Info("[XXX]: Done!!!")
+			logger.Info("Done!!!")
 
 		}
 	case <-time.After(time.Duration(10) * time.Second):
@@ -403,12 +413,12 @@ func TestGossipStateProvider_TestStateMessages(t *testing.T) {
 func waitUntilTrueOrTimeout(t *testing.T, predicate func() bool, timeout time.Duration) {
 	ch := make(chan struct{})
 	go func() {
-		logger.Debug("[@@@@@]: Started to spin off, until predicate will be satisfied.")
+		logger.Debug("Started to spin off, until predicate will be satisfied.")
 		for !predicate() {
 			time.Sleep(1 * time.Second)
 		}
 		ch <- struct{}{}
-		logger.Debug("[@@@@@]: Done.")
+		logger.Debug("Done.")
 	}()
 
 	select {
@@ -418,5 +428,5 @@ func waitUntilTrueOrTimeout(t *testing.T, predicate func() bool, timeout time.Du
 		t.Fatal("Timeout has expired")
 		break
 	}
-	logger.Debug("[>>>>>] Stop wainting until timeout or true")
+	logger.Debug("Stop waiting until timeout or true")
 }

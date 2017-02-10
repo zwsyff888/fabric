@@ -20,16 +20,12 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/hyperledger/fabric/common/ledger/testutil"
 	"github.com/hyperledger/fabric/core/ledger/ledgerconfig"
-	"github.com/hyperledger/fabric/core/ledger/testutil"
 )
 
 //Unit test of couch db util functionality
 func TestCreateCouchDBConnectionAndDB(t *testing.T) {
-
-	//call a helper method to load the core.yaml
-	testutil.SetupCoreYAMLConfig("./../../../../peer")
-
 	if ledgerconfig.IsCouchDBEnabled() == true {
 
 		cleanup()

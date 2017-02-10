@@ -23,6 +23,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/hyperledger/fabric/common/cauthdsl"
 	cutil "github.com/hyperledger/fabric/common/util"
 	"github.com/hyperledger/fabric/core/chaincode"
 	"github.com/hyperledger/fabric/core/chaincode/platforms"
@@ -33,7 +34,6 @@ import (
 	pb "github.com/hyperledger/fabric/protos/peer"
 	putils "github.com/hyperledger/fabric/protos/utils"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 	"golang.org/x/net/context"
 )
 
@@ -53,10 +53,9 @@ func checkSpec(spec *pb.ChaincodeSpec) error {
 }
 
 // getChaincodeBytes get chaincode deployment spec given the chaincode spec
-func getChaincodeBytes(spec *pb.ChaincodeSpec) (*pb.ChaincodeDeploymentSpec, error) {
-	mode := viper.GetString("chaincode.mode")
+func getChaincodeBytes(spec *pb.ChaincodeSpec, crtPkg bool) (*pb.ChaincodeDeploymentSpec, error) {
 	var codePackageBytes []byte
-	if mode != chaincode.DevModeUserRunsChaincode {
+	if chaincode.IsDevMode() == false && crtPkg {
 		var err error
 		if err = checkSpec(spec); err != nil {
 			return nil, err
@@ -87,7 +86,7 @@ func getChaincodeSpecification(cmd *cobra.Command) (*pb.ChaincodeSpec, error) {
 	chaincodeLang = strings.ToUpper(chaincodeLang)
 	spec = &pb.ChaincodeSpec{
 		Type:        pb.ChaincodeSpec_Type(pb.ChaincodeSpec_Type_value[chaincodeLang]),
-		ChaincodeID: &pb.ChaincodeID{Path: chaincodePath, Name: chaincodeName},
+		ChaincodeID: &pb.ChaincodeID{Path: chaincodePath, Name: chaincodeName, Version: chaincodeVersion},
 		Input:       input,
 	}
 	return spec, nil
@@ -135,6 +134,53 @@ func checkChaincodeCmdParams(cmd *cobra.Command) error {
 		return fmt.Errorf("Must supply value for %s name parameter.\n", chainFuncName)
 	}
 
+	if cmd != nil && (cmd == chaincodeInstantiateCmd || cmd == chaincodeInstallCmd || cmd == chaincodeUpgradeCmd) {
+		if chaincodeVersion == "" {
+			return fmt.Errorf("Chaincode version is not provided")
+		}
+	}
+
+	// if it's not a deploy or an upgrade we don't need policy, escc and vscc
+	if cmd.Name() != instantiate_cmdname && cmd.Name() != upgrade_cmdname {
+		if escc != common.UndefinedParamValue {
+			return fmt.Errorf("escc should be supplied only to chaincode deploy requests")
+		}
+
+		if vscc != common.UndefinedParamValue {
+			return fmt.Errorf("vscc should be supplied only to chaincode deploy requests")
+		}
+
+		if policy != common.UndefinedParamValue {
+			return fmt.Errorf("policy should be supplied only to chaincode deploy requests")
+		}
+	} else {
+		if escc != common.UndefinedParamValue {
+			logger.Infof("Using escc %s", escc)
+		} else {
+			logger.Infof("Using default escc")
+			escc = "escc"
+		}
+
+		if vscc != common.UndefinedParamValue {
+			logger.Infof("Using vscc %s", vscc)
+		} else {
+			logger.Infof("Using default vscc")
+			vscc = "vscc"
+		}
+
+		if policy != common.UndefinedParamValue {
+			p, err := cauthdsl.FromString(policy)
+			if err != nil {
+				return fmt.Errorf("Invalid policy %s\n", policy)
+			}
+			policyMarhsalled = putils.MarshalOrPanic(p)
+		} else {
+			// FIXME: we need to get the default from somewhere
+			p := cauthdsl.SignedByMspMember("DEFAULT")
+			policyMarhsalled = putils.MarshalOrPanic(p)
+		}
+	}
+
 	// Check that non-empty chaincode parameters contain only Args as a key.
 	// Type checking is done later when the JSON is actually unmarshaled
 	// into a pb.ChaincodeInput. To better understand what's going
@@ -157,7 +203,9 @@ func checkChaincodeCmdParams(cmd *cobra.Command) error {
 			return fmt.Errorf("Non-empty JSON chaincode parameters must contain the following keys: 'Args' or 'Function' and 'Args'")
 		}
 	} else {
-		return errors.New("Empty JSON chaincode parameters must contain the following keys: 'Args' or 'Function' and 'Args'")
+		if cmd == nil || cmd != chaincodeInstallCmd {
+			return errors.New("Empty JSON chaincode parameters must contain the following keys: 'Args' or 'Function' and 'Args'")
+		}
 	}
 
 	return nil

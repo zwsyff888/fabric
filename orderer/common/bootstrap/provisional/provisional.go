@@ -20,6 +20,7 @@ import (
 	"fmt"
 
 	"github.com/hyperledger/fabric/common/cauthdsl"
+	"github.com/hyperledger/fabric/common/chainconfig"
 	"github.com/hyperledger/fabric/common/configtx"
 	"github.com/hyperledger/fabric/common/genesis"
 	"github.com/hyperledger/fabric/orderer/common/bootstrap"
@@ -29,12 +30,12 @@ import (
 	ab "github.com/hyperledger/fabric/protos/orderer"
 )
 
-// Generator can either create an orderer genesis block or configuration template
+// Generator can either create an orderer genesis block or config template
 type Generator interface {
 	bootstrap.Helper
 
-	// TemplateItems returns a set of configuration items which can be used to initialize a template
-	TemplateItems() []*cb.ConfigurationItem
+	// TemplateItems returns a set of config items which can be used to initialize a template
+	TemplateItems() []*cb.ConfigItem
 }
 
 const (
@@ -49,7 +50,7 @@ const (
 	// networks. It it necessary to set and export this variable so that test
 	// clients can connect without being rejected for targetting a chain which
 	// does not exist.
-	TestChainID = "test_chainid"
+	TestChainID = "testchainid"
 
 	// AcceptAllPolicyKey is the key of the AcceptAllPolicy.
 	AcceptAllPolicyKey = "AcceptAllPolicy"
@@ -59,14 +60,19 @@ const (
 var DefaultChainCreationPolicyNames = []string{AcceptAllPolicyKey}
 
 type bootstrapper struct {
-	minimalItems     []*cb.ConfigurationItem
-	systemChainItems []*cb.ConfigurationItem
+	minimalItems     []*cb.ConfigItem
+	systemChainItems []*cb.ConfigItem
 }
 
 // New returns a new provisional bootstrap helper.
 func New(conf *config.TopLevel) Generator {
 	bs := &bootstrapper{
-		minimalItems: []*cb.ConfigurationItem{
+		minimalItems: []*cb.ConfigItem{
+			// Chain Config Types
+			chainconfig.DefaultHashingAlgorithm(),
+			chainconfig.DefaultBlockDataHashingStructure(),
+			chainconfig.TemplateOrdererAddresses([]string{fmt.Sprintf("%s:%d", conf.General.ListenAddress, conf.General.ListenPort)}),
+
 			// Orderer Config Types
 			sharedconfig.TemplateConsensusType(conf.Genesis.OrdererType),
 			sharedconfig.TemplateBatchSize(&ab.BatchSize{
@@ -79,11 +85,11 @@ func New(conf *config.TopLevel) Generator {
 			sharedconfig.TemplateEgressPolicyNames([]string{AcceptAllPolicyKey}),
 
 			// Policies
-			cauthdsl.TemplatePolicy(configtx.NewConfigurationItemPolicyKey, cauthdsl.RejectAllPolicy),
+			cauthdsl.TemplatePolicy(configtx.NewConfigItemPolicyKey, cauthdsl.RejectAllPolicy),
 			cauthdsl.TemplatePolicy(AcceptAllPolicyKey, cauthdsl.AcceptAllPolicy),
 		},
 
-		systemChainItems: []*cb.ConfigurationItem{
+		systemChainItems: []*cb.ConfigItem{
 			sharedconfig.TemplateChainCreationPolicyNames(DefaultChainCreationPolicyNames),
 		},
 	}
@@ -99,7 +105,7 @@ func New(conf *config.TopLevel) Generator {
 	return bs
 }
 
-func (bs *bootstrapper) TemplateItems() []*cb.ConfigurationItem {
+func (bs *bootstrapper) TemplateItems() []*cb.ConfigItem {
 	return bs.minimalItems
 }
 

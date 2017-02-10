@@ -25,9 +25,12 @@ import (
 // FIXME: we need better comments on the interfaces!!
 // FIXME: we need better comments on the interfaces!!
 
-//Common is implemented by both MSPManger and MSP
-type Common interface {
-	// DeserializeIdentity deserializes an identity
+// IdentityDeserializer is implemented by both MSPManger and MSP
+type IdentityDeserializer interface {
+	// DeserializeIdentity deserializes an identity.
+	// Deserialization will fail if the identity is associated to
+	// an msp that is different from this one that is performing
+	// the deserialization.
 	DeserializeIdentity(serializedIdentity []byte) (Identity, error)
 }
 
@@ -52,8 +55,8 @@ type Common interface {
 // This object is immutable, it is initialized once and never changed.
 type MSPManager interface {
 
-	// Common interface needs to be implemented by MSPManager
-	Common
+	// IdentityDeserializer interface needs to be implemented by MSPManager
+	IdentityDeserializer
 
 	// Setup the MSP manager instance according to configuration information
 	Setup(msps []*msp.MSPConfig) error
@@ -66,8 +69,8 @@ type MSPManager interface {
 // to accommodate peer functionality
 type MSP interface {
 
-	// Common interface needs to be implemented by MSP
-	Common
+	// IdentityDeserializer interface needs to be implemented by MSP
+	IdentityDeserializer
 
 	// Setup the MSP instance according to configuration information
 	Setup(config *msp.MSPConfig) error
@@ -139,8 +142,8 @@ type Identity interface {
 	// VerifyOpts a signature over some message using this identity as reference
 	VerifyOpts(msg []byte, sig []byte, opts SignatureOpts) error
 
-	// VerifyAttributes verifies attributes given proofs
-	VerifyAttributes(proof [][]byte, spec *AttributeProofSpec) error
+	// VerifyAttributes verifies attributes given a proof
+	VerifyAttributes(proof []byte, spec *AttributeProofSpec) error
 
 	// Serialize converts an identity to bytes
 	Serialize() ([]byte, error)
@@ -167,7 +170,7 @@ type SigningIdentity interface {
 	// SignOpts the message with options
 	SignOpts(msg []byte, opts SignatureOpts) ([]byte, error)
 
-	// GetAttributeProof creates a proof for an attribute
+	// GetAttributeProof creates a proof for a set of attributes
 	GetAttributeProof(spec *AttributeProofSpec) (proof []byte, err error)
 
 	// GetPublicVersion returns the public parts of this identity

@@ -43,7 +43,7 @@ func NewFactoryImpl(template configtx.Template) Factory {
 }
 
 func (f *factory) Block(chainID string) (*cb.Block, error) {
-	items, err := f.template.Items(chainID)
+	configEnv, err := f.template.Envelope(chainID)
 	if err != nil {
 		return nil, err
 	}
@@ -51,14 +51,14 @@ func (f *factory) Block(chainID string) (*cb.Block, error) {
 	payloadChainHeader := utils.MakeChainHeader(cb.HeaderType_CONFIGURATION_TRANSACTION, msgVersion, chainID, epoch)
 	payloadSignatureHeader := utils.MakeSignatureHeader(nil, utils.CreateNonceOrPanic())
 	payloadHeader := utils.MakePayloadHeader(payloadChainHeader, payloadSignatureHeader)
-	payload := &cb.Payload{Header: payloadHeader, Data: utils.MarshalOrPanic(&cb.ConfigurationEnvelope{Items: items})}
+	payload := &cb.Payload{Header: payloadHeader, Data: utils.MarshalOrPanic(configEnv)}
 	envelope := &cb.Envelope{Payload: utils.MarshalOrPanic(payload), Signature: nil}
 
 	block := cb.NewBlock(0, nil)
 	block.Data = &cb.BlockData{Data: [][]byte{utils.MarshalOrPanic(envelope)}}
 	block.Header.DataHash = block.Data.Hash()
 	block.Metadata.Metadata[cb.BlockMetadataIndex_LAST_CONFIGURATION] = utils.MarshalOrPanic(&cb.Metadata{
-		Value: utils.MarshalOrPanic(&cb.LastConfiguration{Index: 0}),
+		Value: utils.MarshalOrPanic(&cb.LastConfig{Index: 0}),
 	})
 	return block, nil
 }

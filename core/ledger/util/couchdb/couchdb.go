@@ -33,8 +33,8 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 
-	"github.com/hyperledger/fabric/core/ledger/kvledger/txmgmt/version"
 	logging "github.com/op/go-logging"
 )
 
@@ -103,9 +103,8 @@ type DocID struct {
 
 //QueryResult is used for returning query results from CouchDB
 type QueryResult struct {
-	ID      string
-	Version *version.Height
-	Value   []byte
+	ID    string
+	Value []byte
 }
 
 //CouchConnectionDef contains parameters
@@ -335,16 +334,18 @@ func (dbclient *CouchDatabase) EnsureFullCommit() (*DBOperationResponse, error) 
 
 //SaveDoc method provides a function to save a document, id and byte array
 func (dbclient *CouchDatabase) SaveDoc(id string, rev string, bytesDoc []byte, attachments []Attachment) (string, error) {
-
 	logger.Debugf("Entering SaveDoc()")
-
+	if !utf8.ValidString(id) {
+		return "", fmt.Errorf("doc id [%x] not a valid utf8 string", id)
+	}
 	saveURL, err := url.Parse(dbclient.couchInstance.conf.URL)
 	if err != nil {
 		logger.Errorf("URL parse error: %s", err.Error())
 		return "", err
 	}
-	saveURL.Path = dbclient.dbName + "/" + id
-
+	saveURL.Path = dbclient.dbName
+	// id can contain a '/', so encode separately
+	saveURL = &url.URL{Opaque: saveURL.String() + "/" + encodePathElement(id)}
 	logger.Debugf("  id=%s,  value=%s", id, string(bytesDoc))
 
 	if rev == "" {
@@ -382,7 +383,7 @@ func (dbclient *CouchDatabase) SaveDoc(id string, rev string, bytesDoc []byte, a
 	} else { // there are attachments
 
 		//attachments are included, create the multipart definition
-		multipartData, multipartBoundary, err3 := createAttachmentPart(*data, attachments, defaultBoundary)
+		multipartData, multipartBoundary, err3 := createAttachmentPart(bytesDoc, attachments, defaultBoundary)
 		if err3 != nil {
 			return "", err3
 		}
@@ -414,10 +415,13 @@ func (dbclient *CouchDatabase) SaveDoc(id string, rev string, bytesDoc []byte, a
 
 }
 
-func createAttachmentPart(data bytes.Buffer, attachments []Attachment, defaultBoundary string) (bytes.Buffer, string, error) {
+func createAttachmentPart(data []byte, attachments []Attachment, defaultBoundary string) (bytes.Buffer, string, error) {
+
+	//Create a buffer for writing the result
+	writeBuffer := new(bytes.Buffer)
 
 	// read the attachment and save as an attachment
-	writer := multipart.NewWriter(&data)
+	writer := multipart.NewWriter(writeBuffer)
 
 	//retrieve the boundary for the multipart
 	defaultBoundary = writer.Boundary()
@@ -431,6 +435,21 @@ func createAttachmentPart(data bytes.Buffer, attachments []Attachment, defaultBo
 	attachmentJSONMap := map[string]interface{}{
 		"_attachments": fileAttachments}
 
+	//Add any data uploaded with the files
+	if data != nil {
+
+		//create a generic map
+		genericMap := make(map[string]interface{})
+		//unmarshal the data into the generic map
+		json.Unmarshal(data, &genericMap)
+
+		//add all key/values to the attachmentJSONMap
+		for jsonKey, jsonValue := range genericMap {
+			attachmentJSONMap[jsonKey] = jsonValue
+		}
+
+	}
+
 	filesForUpload, _ := json.Marshal(attachmentJSONMap)
 	logger.Debugf(string(filesForUpload))
 
@@ -440,7 +459,7 @@ func createAttachmentPart(data bytes.Buffer, attachments []Attachment, defaultBo
 
 	part, err := writer.CreatePart(header)
 	if err != nil {
-		return data, defaultBoundary, err
+		return *writeBuffer, defaultBoundary, err
 	}
 
 	part.Write(filesForUpload)
@@ -450,7 +469,7 @@ func createAttachmentPart(data bytes.Buffer, attachments []Attachment, defaultBo
 		header := make(textproto.MIMEHeader)
 		part, err2 := writer.CreatePart(header)
 		if err2 != nil {
-			return data, defaultBoundary, err2
+			return *writeBuffer, defaultBoundary, err2
 		}
 		part.Write(attachment.AttachmentBytes)
 
@@ -458,10 +477,10 @@ func createAttachmentPart(data bytes.Buffer, attachments []Attachment, defaultBo
 
 	err = writer.Close()
 	if err != nil {
-		return data, defaultBoundary, err
+		return *writeBuffer, defaultBoundary, err
 	}
 
-	return data, defaultBoundary, nil
+	return *writeBuffer, defaultBoundary, nil
 
 }
 
@@ -483,14 +502,17 @@ func getRevisionHeader(resp *http.Response) (string, error) {
 func (dbclient *CouchDatabase) ReadDoc(id string) ([]byte, string, error) {
 
 	logger.Debugf("Entering ReadDoc()  id=%s", id)
-
+	if !utf8.ValidString(id) {
+		return nil, "", fmt.Errorf("doc id [%x] not a valid utf8 string", id)
+	}
 	readURL, err := url.Parse(dbclient.couchInstance.conf.URL)
 	if err != nil {
 		logger.Errorf("URL parse error: %s", err.Error())
 		return nil, "", err
 	}
-	readURL.Path = dbclient.dbName + "/" + id
-
+	readURL.Path = dbclient.dbName
+	// id can contain a '/', so encode separately
+	readURL = &url.URL{Opaque: readURL.String() + "/" + encodePathElement(id)}
 	query := readURL.Query()
 	query.Add("attachments", "true")
 
@@ -626,16 +648,19 @@ func (dbclient *CouchDatabase) ReadDocRange(startKey, endKey string, limit, skip
 
 	//Append the startKey if provided
 	if startKey != "" {
-		startKey = strconv.QuoteToGraphic(startKey)
-		startKey = strings.Replace(startKey, "\\x00", "\\u0000", 1)
+		var err error
+		if startKey, err = encodeForJSON(startKey); err != nil {
+			return nil, err
+		}
 		queryParms.Add("startkey", startKey)
 	}
 
 	//Append the endKey if provided
 	if endKey != "" {
-		endKey = strconv.QuoteToGraphic(endKey)
-		endKey = strings.Replace(endKey, "\\x00", "\\u0000", 1)
-		endKey = strings.Replace(endKey, "\\x01", "\\u0001", 1) //TODO add general unicode support instead of special cases
+		var err error
+		if endKey, err = encodeForJSON(endKey); err != nil {
+			return nil, err
+		}
 		queryParms.Add("endkey", endKey)
 	}
 
@@ -686,7 +711,7 @@ func (dbclient *CouchDatabase) ReadDocRange(startKey, endKey string, limit, skip
 				return nil, err
 			}
 
-			var addDocument = &QueryResult{jsonDoc.ID, version.NewHeight(1, 1), binaryDocument}
+			var addDocument = &QueryResult{jsonDoc.ID, binaryDocument}
 
 			results = append(results, *addDocument)
 
@@ -694,7 +719,7 @@ func (dbclient *CouchDatabase) ReadDocRange(startKey, endKey string, limit, skip
 
 			logger.Debugf("Adding json docment for id: %s", jsonDoc.ID)
 
-			var addDocument = &QueryResult{jsonDoc.ID, version.NewHeight(1, 1), row.Doc}
+			var addDocument = &QueryResult{jsonDoc.ID, row.Doc}
 
 			results = append(results, *addDocument)
 
@@ -772,7 +797,7 @@ func (dbclient *CouchDatabase) QueryDocuments(query string, limit, skip int) (*[
 		logger.Debugf("Adding row to resultset: %s", row)
 
 		//TODO Replace the temporary NewHeight version when available
-		var addDocument = &QueryResult{jsonDoc.ID, version.NewHeight(1, 1), row}
+		var addDocument = &QueryResult{jsonDoc.ID, row}
 
 		results = append(results, *addDocument)
 
@@ -890,4 +915,23 @@ func (dbclient *CouchDatabase) handleRequest(method, connectURL string, data io.
 func IsJSON(s string) bool {
 	var js map[string]interface{}
 	return json.Unmarshal([]byte(s), &js) == nil
+}
+
+// encodePathElement uses Golang for encoding and in addition, replaces a '/' by %2F.
+// Otherwise, in the regular encoding, a '/' is treated as a path separator in the url
+func encodePathElement(str string) string {
+	u := &url.URL{}
+	u.Path = str
+	encodedStr := u.String()
+	encodedStr = strings.Replace(encodedStr, "/", "%2F", -1)
+	return encodedStr
+}
+
+func encodeForJSON(str string) (string, error) {
+	buf := &bytes.Buffer{}
+	encoder := json.NewEncoder(buf)
+	if err := encoder.Encode(str); err != nil {
+		return "", err
+	}
+	return buf.String(), nil
 }

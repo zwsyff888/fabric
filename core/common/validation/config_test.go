@@ -20,17 +20,13 @@ import (
 	"testing"
 
 	"github.com/hyperledger/fabric/common/configtx"
-	"github.com/hyperledger/fabric/common/configtx/test"
+	configtxtest "github.com/hyperledger/fabric/common/configtx/test"
 	"github.com/hyperledger/fabric/common/util"
-	"github.com/hyperledger/fabric/protos/utils"
 )
 
 func TestValidateConfigTx(t *testing.T) {
 	chainID := util.GetTestChainID()
-	oTemplate := test.GetOrdererTemplate()
-	mspcfg := configtx.NewSimpleTemplate(utils.EncodeMSPUnsigned(chainID))
-	chCrtTemp := configtx.NewCompositeTemplate(oTemplate, mspcfg)
-	chCrtEnv, err := configtx.MakeChainCreationTransaction(test.AcceptAllPolicyKey, chainID, signer, chCrtTemp)
+	chCrtEnv, err := configtx.MakeChainCreationTransaction(configtxtest.AcceptAllPolicyKey, chainID, signer, configtxtest.CompositeTemplate())
 	if err != nil {
 		t.Fatalf("MakeChainCreationTransaction failed, err %s", err)
 		return
