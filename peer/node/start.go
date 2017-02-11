@@ -237,10 +237,6 @@ func serve(args []string) error {
 		client.RunClient()
 	}
 
-	// sets the logging level for the 'error' module to the default value from
-	// core.yaml. it can also be updated dynamically using
-	// "peer logging setlevel error <log-level>"
-	common.SetErrorLoggingLevel()
 	peerStatusBool := viper.GetBool("peer.statusPeer.enabled")
 	if peerStatusBool {
 		go StatusClient()
