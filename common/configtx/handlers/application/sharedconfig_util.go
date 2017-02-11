@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package sharedconfig
+package application
 
 import (
 	cb "github.com/hyperledger/fabric/protos/common"
@@ -27,7 +27,7 @@ var defaultAnchorPeers = []*pb.AnchorPeer{}
 // TemplateAnchorPeers creates a headerless config item representing the anchor peers
 func TemplateAnchorPeers(anchorPeers []*pb.AnchorPeer) *cb.ConfigItem {
 	return &cb.ConfigItem{
-		Type:  cb.ConfigItem_Peer,
+		Type:  cb.ConfigItem_PEER,
 		Key:   AnchorPeersKey,
 		Value: utils.MarshalOrPanic(&pb.AnchorPeers{AnchorPeers: anchorPeers}),
 	}

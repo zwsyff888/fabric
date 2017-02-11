@@ -19,9 +19,9 @@ package multichain
 import (
 	"github.com/hyperledger/fabric/common/chainconfig"
 	"github.com/hyperledger/fabric/common/configtx"
+	configtxapi "github.com/hyperledger/fabric/common/configtx/api"
 	"github.com/hyperledger/fabric/common/policies"
 	"github.com/hyperledger/fabric/orderer/common/filter"
-	"github.com/hyperledger/fabric/orderer/common/sharedconfig"
 	cb "github.com/hyperledger/fabric/protos/common"
 	ab "github.com/hyperledger/fabric/protos/orderer"
 
@@ -37,7 +37,7 @@ type chainCreator interface {
 type limitedSupport interface {
 	ChainID() string
 	PolicyManager() policies.Manager
-	SharedConfig() sharedconfig.Manager
+	SharedConfig() configtxapi.OrdererConfig
 	ChainConfig() chainconfig.Descriptor
 	Enqueue(env *cb.Envelope) bool
 }
@@ -158,7 +158,7 @@ func (sc *systemChain) authorize(configEnvelope *cb.ConfigEnvelope) cb.Status {
 
 	var creationConfigItem *cb.ConfigItem
 	for _, item := range config.Items {
-		if item.Type == cb.ConfigItem_Orderer && item.Key == configtx.CreationPolicyKey {
+		if item.Type == cb.ConfigItem_ORDERER && item.Key == configtx.CreationPolicyKey {
 			creationConfigItem = item
 			break
 		}
