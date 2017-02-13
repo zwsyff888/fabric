@@ -53,9 +53,9 @@ func getBlockDataByIndex(j int, blocks []*common.Block) *pb.Mblock {
 			fmt.Println("@@@@chenqiao: err", err)
 			continue
 		}
-		txid := p.Header.ChainHeader.TxID
-		tchainID := p.Header.ChainHeader.ChainID
-		time := p.Header.ChainHeader.Timestamp
+		txid := p.Header.ChannelHeader.TxId
+		tchainID := p.Header.ChannelHeader.ChannelId
+		time := p.Header.ChannelHeader.Timestamp
 
 		// fmt.Println("@@@@ chenqiao txid: ", txid)
 		// fmt.Println("@@@@ chenqiao tchainID: ", tchainID)
