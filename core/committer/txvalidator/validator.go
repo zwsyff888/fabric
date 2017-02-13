@@ -118,7 +118,7 @@ func (v *txValidator) Validate(block *common.Block) error {
 					continue
 				}
 
-				chain := payload.Header.ChainHeader.ChainID
+				chain := payload.Header.ChannelHeader.ChannelId
 				logger.Debug("Transaction is for chain %s", chain)
 
 				if !v.chainExists(chain) {
@@ -126,9 +126,9 @@ func (v *txValidator) Validate(block *common.Block) error {
 					continue
 				}
 
-				if common.HeaderType(payload.Header.ChainHeader.Type) == common.HeaderType_ENDORSER_TRANSACTION {
+				if common.HeaderType(payload.Header.ChannelHeader.Type) == common.HeaderType_ENDORSER_TRANSACTION {
 					// Check duplicate transactions
-					txID := payload.Header.ChainHeader.TxID
+					txID := payload.Header.ChannelHeader.TxId
 					if _, err := v.support.Ledger().GetTransactionByID(txID); err == nil {
 						logger.Warning("Duplicate transaction found, ", txID, ", skipping")
 						continue
@@ -141,7 +141,7 @@ func (v *txValidator) Validate(block *common.Block) error {
 						logger.Errorf("VSCCValidateTx for transaction txId = %s returned error %s", txID, err)
 						continue
 					}
-				} else if common.HeaderType(payload.Header.ChainHeader.Type) == common.HeaderType_CONFIGURATION_TRANSACTION {
+				} else if common.HeaderType(payload.Header.ChannelHeader.Type) == common.HeaderType_CONFIGURATION_TRANSACTION {
 					configEnvelope, err := configtx.UnmarshalConfigEnvelope(payload.Data)
 					if err != nil {
 						err := fmt.Errorf("Error unmarshaling config which passed initial validity checks: %s", err)
@@ -179,7 +179,7 @@ func (v *txValidator) Validate(block *common.Block) error {
 
 func (v *vsccValidatorImpl) VSCCValidateTx(payload *common.Payload, envBytes []byte) error {
 	// Chain ID
-	chainID := payload.Header.ChainHeader.ChainID
+	chainID := payload.Header.ChannelHeader.ChannelId
 	if chainID == "" {
 		err := fmt.Errorf("transaction header does not contain an chain ID")
 		logger.Errorf("%s", err)
@@ -187,8 +187,8 @@ func (v *vsccValidatorImpl) VSCCValidateTx(payload *common.Payload, envBytes []b
 	}
 
 	// Get transaction id
-	txid := payload.Header.ChainHeader.TxID
-	logger.Info("[XXX remove me XXX] Transaction type,", common.HeaderType(payload.Header.ChainHeader.Type))
+	txid := payload.Header.ChannelHeader.TxId
+	logger.Info("[XXX remove me XXX] Transaction type,", common.HeaderType(payload.Header.ChannelHeader.Type))
 	if txid == "" {
 		err := fmt.Errorf("transaction header does not contain transaction ID")
 		logger.Errorf("%s", err)
@@ -213,14 +213,14 @@ func (v *vsccValidatorImpl) VSCCValidateTx(payload *common.Payload, envBytes []b
 	// policy validation to determine whether the issuer
 	// is entitled to deploy a chaincode on our chain
 	// VSCCValidateTx should
-	if hdrExt.ChaincodeID.Name == "lccc" {
+	if hdrExt.ChaincodeId.Name == "lccc" {
 		// TODO: until FAB-1934 is in, we need to stop here
 		logger.Infof("Invocation of LCCC detected, no further VSCC validation necessary")
 		return nil
 	}
 
 	// obtain name of the VSCC and the policy from LCCC
-	vscc, policy, err := v.ccprovider.GetCCValidationInfoFromLCCC(ctxt, txid, nil, chainID, hdrExt.ChaincodeID.Name)
+	vscc, policy, err := v.ccprovider.GetCCValidationInfoFromLCCC(ctxt, txid, nil, chainID, hdrExt.ChaincodeId.Name)
 	if err != nil {
 		logger.Errorf("Unable to get chaincode data from LCCC for txid %s, due to %s", txid, err)
 		return err

@@ -118,17 +118,19 @@ func TestQueryGetBlockByHash(t *testing.T) {
 	}
 }
 
-func TestQueryGetQueryResult(t *testing.T) {
-	viper.Set("peer.fileSystemPath", "/var/hyperledger/test7/")
-	defer os.RemoveAll("/var/hyperledger/test7/")
+func TestQueryGetBlockByTxID(t *testing.T) {
+	viper.Set("peer.fileSystemPath", "/var/hyperledger/test8/")
+	defer os.RemoveAll("/var/hyperledger/test8/")
 	peer.MockInitialize()
-	peer.MockCreateChain("mytestchainid7")
+	peer.MockCreateChain("mytestchainid8")
 
 	e := new(LedgerQuerier)
 	stub := shim.NewMockStub("LedgerQuerier", e)
-	qstring := "{\"selector\":{\"key\":\"value\"}}"
-	args := [][]byte{[]byte(GetQueryResult), []byte("mytestchainid7"), []byte(qstring)}
+
+	txID := ""
+
+	args := [][]byte{[]byte(GetBlockByTxID), []byte("mytestchainid8"), []byte(txID)}
 	if res := stub.MockInvoke("1", args); res.Status == shim.OK {
-		t.Fatalf("qscc GetQueryResult should have failed with invalid query: abc")
+		t.Fatalf("qscc GetBlockByTxID should have failed with invalid txID: %s", txID)
 	}
 }

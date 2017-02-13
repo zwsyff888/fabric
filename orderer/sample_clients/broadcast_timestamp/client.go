@@ -43,8 +43,8 @@ func newBroadcastClient(client ab.AtomicBroadcast_BroadcastClient, chainID strin
 func (s *broadcastClient) broadcast(transaction []byte) error {
 	payload, err := proto.Marshal(&cb.Payload{
 		Header: &cb.Header{
-			ChainHeader: &cb.ChainHeader{
-				ChainID: s.chainID,
+			ChannelHeader: &cb.ChannelHeader{
+				ChannelId: s.chainID,
 			},
 			SignatureHeader: &cb.SignatureHeader{},
 		},

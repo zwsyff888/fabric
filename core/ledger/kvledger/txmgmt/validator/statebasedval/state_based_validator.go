@@ -107,7 +107,7 @@ func (v *Validator) ValidateAndPrepareBatch(block *common.Block, doMVCCValidatio
 		}
 
 		valid := false
-		if common.HeaderType(payload.Header.ChainHeader.Type) == common.HeaderType_ENDORSER_TRANSACTION {
+		if common.HeaderType(payload.Header.ChannelHeader.Type) == common.HeaderType_ENDORSER_TRANSACTION {
 			txRWSet, err := v.validateEndorserTX(envBytes, doMVCCValidation, updates)
 			if err != nil {
 				return nil, err
@@ -118,13 +118,13 @@ func (v *Validator) ValidateAndPrepareBatch(block *common.Block, doMVCCValidatio
 				addWriteSetToBatch(txRWSet, committingTxHeight, updates)
 				valid = true
 			}
-		} else if common.HeaderType(payload.Header.ChainHeader.Type) == common.HeaderType_CONFIGURATION_TRANSACTION {
+		} else if common.HeaderType(payload.Header.ChannelHeader.Type) == common.HeaderType_CONFIGURATION_TRANSACTION {
 			valid, err = v.validateConfigTX(env)
 			if err != nil {
 				return nil, err
 			}
 		} else {
-			logger.Errorf("Skipping transaction %d that's not an endorsement or configuration %d", txIndex, payload.Header.ChainHeader.Type)
+			logger.Errorf("Skipping transaction %d that's not an endorsement or configuration %d", txIndex, payload.Header.ChannelHeader.Type)
 			valid = false
 		}
 
@@ -211,64 +211,26 @@ func (v *Validator) validateRangeQueries(ns string, rangeQueriesInfo []*rwset.Ra
 // in the current block and yet to be committed as part of group commit at the end of the validation of the block)
 func (v *Validator) validateRangeQuery(ns string, rangeQueryInfo *rwset.RangeQueryInfo, updates *statedb.UpdateBatch) (bool, error) {
 	logger.Debugf("validateRangeQuery: ns=%s, rangeQueryInfo=%s", ns, rangeQueryInfo)
-	var dbItr statedb.ResultsIterator
-	var updatesItr statedb.ResultsIterator
-	var combinedItr statedb.ResultsIterator
-	var err error
-	if dbItr, err = v.db.GetStateRangeScanIterator(ns, rangeQueryInfo.StartKey, rangeQueryInfo.EndKey); err != nil {
-		return false, err
-	}
-	updatesItr = updates.GetRangeScanIterator(ns, rangeQueryInfo.StartKey, rangeQueryInfo.EndKey)
-	if combinedItr, err = newCombinedIterator(ns, dbItr, updatesItr); err != nil {
+
+	// If during simulation, the caller had not exhausted the iterator so
+	// rangeQueryInfo.EndKey is not actual endKey given by the caller in the range query
+	// but rather it is the last key seen by the caller and hence the combinedItr should include the endKey in the results.
+	includeEndKey := !rangeQueryInfo.ItrExhausted
+
+	combinedItr, err := newCombinedIterator(v.db, updates,
+		ns, rangeQueryInfo.StartKey, rangeQueryInfo.EndKey, includeEndKey)
+	if err != nil {
 		return false, err
 	}
 	defer combinedItr.Close()
-	rqResults := rangeQueryInfo.GetResults()
-	lastIndexToVerify := len(rqResults) - 1
-
-	if !rangeQueryInfo.ItrExhausted {
-		// During simulation the caller had not exhausted the iterator so
-		// rangeQueryInfo.EndKey is not actual endKey given by the caller in the range query.
-		// Leveldb results exclude the endkey so just iterate one short of the results present
-		// in the rangeQueryInfo. Check for the last result explicitly
-		lastIndexToVerify--
-		logger.Debugf("Checking last result")
-		if valid, err := v.validateKVRead(ns, rqResults[len(rqResults)-1], updates); !valid || err != nil {
-			return valid, err
-		}
+	var validator rangeQueryValidator
+	if rangeQueryInfo.ResultHash != nil {
+		logger.Debug(`Hashing results are present in the range query info hence, initiating hashing based validation`)
+		validator = &rangeQueryHashValidator{}
+	} else {
+		logger.Debug(`Hashing results are not present in the range query info hence, initiating raw KVReads based validation`)
+		validator = &rangeQueryResultsValidator{}
 	}
-
-	var queryResponse statedb.QueryResult
-	// Iterate over sorted results in the rangeQueryInfo and compare
-	// with the results retruned by the combined iterator and return false at first mismatch
-	for i := 0; i <= lastIndexToVerify; i++ {
-		kvRead := rqResults[i]
-		if queryResponse, err = combinedItr.Next(); err != nil {
-			return false, err
-		}
-		logger.Debugf("comparing kvRead=[%#v] to queryResponse=[%#v]", kvRead, queryResponse)
-		if queryResponse == nil {
-			logger.Debugf("Query response nil. Key [%s] got deleted", kvRead.Key)
-			return false, nil
-		}
-		versionedKV := queryResponse.(*statedb.VersionedKV)
-		if versionedKV.Key != kvRead.Key {
-			logger.Debugf("key name mismatch: Key in rwset = [%s], key in query results = [%s]", kvRead.Key, versionedKV.Key)
-			return false, nil
-		}
-		if !version.AreSame(versionedKV.Version, kvRead.Version) {
-			logger.Debugf(`Version mismatch for key [%s]: Version in rwset = [%#v], latest version = [%#v]`,
-				versionedKV.Key, versionedKV.Version, kvRead.Version)
-			return false, nil
-		}
-	}
-	if queryResponse, err = combinedItr.Next(); err != nil {
-		return false, err
-	}
-	if queryResponse != nil {
-		// iterator is not exhausted - which means that there are extra results in the given range
-		logger.Debugf("Extra result = [%#v]", queryResponse)
-		return false, nil
-	}
-	return true, nil
+	validator.init(rangeQueryInfo, combinedItr)
+	return validator.validate()
 }

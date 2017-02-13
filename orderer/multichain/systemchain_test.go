@@ -20,10 +20,9 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/hyperledger/fabric/common/chainconfig"
 	"github.com/hyperledger/fabric/common/configtx"
 	configtxapi "github.com/hyperledger/fabric/common/configtx/api"
-	mockchainconfig "github.com/hyperledger/fabric/common/mocks/chainconfig"
+	mockconfigtxchannel "github.com/hyperledger/fabric/common/mocks/configtx/handlers/channel"
 	mockconfigtxorderer "github.com/hyperledger/fabric/common/mocks/configtx/handlers/orderer"
 	"github.com/hyperledger/fabric/common/policies"
 	"github.com/hyperledger/fabric/orderer/common/bootstrap/provisional"
@@ -53,7 +52,7 @@ type mockSupport struct {
 	msc         *mockconfigtxorderer.SharedConfig
 	chainID     string
 	queue       []*cb.Envelope
-	chainConfig *mockchainconfig.Descriptor
+	chainConfig *mockconfigtxchannel.SharedConfig
 }
 
 func newMockSupport(chainID string) *mockSupport {
@@ -61,7 +60,7 @@ func newMockSupport(chainID string) *mockSupport {
 		mpm:         &mockPolicyManager{},
 		msc:         &mockconfigtxorderer.SharedConfig{},
 		chainID:     chainID,
-		chainConfig: &mockchainconfig.Descriptor{},
+		chainConfig: &mockconfigtxchannel.SharedConfig{},
 	}
 }
 
@@ -82,7 +81,7 @@ func (ms *mockSupport) SharedConfig() configtxapi.OrdererConfig {
 	return ms.msc
 }
 
-func (ms *mockSupport) ChainConfig() chainconfig.Descriptor {
+func (ms *mockSupport) ChannelConfig() configtxapi.ChannelConfig {
 	return ms.chainConfig
 }
 
@@ -133,7 +132,7 @@ func TestGoodProposal(t *testing.T) {
 
 	wrapped := mcc.ms.queue[0]
 	payload := utils.UnmarshalPayloadOrPanic(wrapped.Payload)
-	if payload.Header.ChainHeader.Type != int32(cb.HeaderType_ORDERER_TRANSACTION) {
+	if payload.Header.ChannelHeader.Type != int32(cb.HeaderType_ORDERER_TRANSACTION) {
 		t.Fatalf("Wrapped transaction should be of type ORDERER_TRANSACTION")
 	}
 	envelope := utils.UnmarshalEnvelopeOrPanic(payload.Data)

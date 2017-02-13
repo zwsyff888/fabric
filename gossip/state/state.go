@@ -48,7 +48,7 @@ type GossipStateProvider interface {
 }
 
 var remoteStateMsgFilter = func(message interface{}) bool {
-	return message.(comm.ReceivedMessage).GetGossipMessage().IsRemoteStateMessage()
+	return message.(proto.ReceivedMessage).GetGossipMessage().IsRemoteStateMessage()
 }
 
 const (
@@ -69,7 +69,7 @@ type GossipStateProviderImpl struct {
 	// Channel to read gossip messages from
 	gossipChan <-chan *proto.GossipMessage
 
-	commChan <-chan comm.ReceivedMessage
+	commChan <-chan proto.ReceivedMessage
 
 	// Flag which signals for termination
 	stopFlag int32
@@ -177,7 +177,7 @@ func (s *GossipStateProviderImpl) listen() {
 	s.done.Done()
 }
 
-func (s *GossipStateProviderImpl) directMessage(msg comm.ReceivedMessage) {
+func (s *GossipStateProviderImpl) directMessage(msg proto.ReceivedMessage) {
 	s.logger.Debug("[ENTER] -> directMessage")
 	defer s.logger.Debug("[EXIT] ->  directMessage")
 
@@ -201,7 +201,7 @@ func (s *GossipStateProviderImpl) directMessage(msg comm.ReceivedMessage) {
 	}
 }
 
-func (s *GossipStateProviderImpl) handleStateRequest(msg comm.ReceivedMessage) {
+func (s *GossipStateProviderImpl) handleStateRequest(msg proto.ReceivedMessage) {
 	request := msg.GetGossipMessage().GetStateRequest()
 	response := &proto.RemoteStateResponse{Payloads: make([]*proto.Payload, 0)}
 	for _, seqNum := range request.SeqNums {
@@ -233,7 +233,7 @@ func (s *GossipStateProviderImpl) handleStateRequest(msg comm.ReceivedMessage) {
 	})
 }
 
-func (s *GossipStateProviderImpl) handleStateResponse(msg comm.ReceivedMessage) {
+func (s *GossipStateProviderImpl) handleStateResponse(msg proto.ReceivedMessage) {
 	response := msg.GetGossipMessage().GetStateResponse()
 	for _, payload := range response.GetPayloads() {
 		s.logger.Debugf("Received payload with sequence number %d.", payload.SeqNum)
@@ -339,11 +339,11 @@ func (s *GossipStateProviderImpl) antiEntropy() {
 func (s *GossipStateProviderImpl) requestBlocksInRange(start uint64, end uint64) {
 	var peers []*comm.RemotePeer
 	// Filtering peers which might have relevant blocks
-	for _, value := range s.gossip.PeersOfChannel(common2.ChainID(s.chainID)) {
-		nodeMetadata, err := FromBytes(value.Metadata)
+	for _, netMember := range s.gossip.PeersOfChannel(common2.ChainID(s.chainID)) {
+		nodeMetadata, err := FromBytes(netMember.Metadata)
 		if err == nil {
 			if nodeMetadata.LedgerHeight >= end {
-				peers = append(peers, &comm.RemotePeer{Endpoint: value.Endpoint, PKIID: value.PKIid})
+				peers = append(peers, &comm.RemotePeer{Endpoint: netMember.PreferredEndpoint(), PKIID: netMember.PKIid})
 			}
 		} else {
 			s.logger.Errorf("Unable to de-serialize node meta state, error = %s", err)

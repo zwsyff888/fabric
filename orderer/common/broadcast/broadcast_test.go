@@ -74,7 +74,7 @@ func (mm *mockSupportManager) GetChain(chainID string) (Support, bool) {
 func (mm *mockSupportManager) ProposeChain(configTx *cb.Envelope) cb.Status {
 	payload := utils.ExtractPayloadOrPanic(configTx)
 
-	mm.chains[string(payload.Header.ChainHeader.ChainID)] = &mockSupport{
+	mm.chains[string(payload.Header.ChannelHeader.ChannelId)] = &mockSupport{
 		filters: filter.NewRuleSet([]filter.Rule{
 			filter.EmptyRejectRule,
 			filter.AcceptRule,
@@ -101,9 +101,9 @@ func makeConfigMessage(chainID string) *cb.Envelope {
 	payload := &cb.Payload{
 		Data: utils.MarshalOrPanic(&cb.ConfigEnvelope{}),
 		Header: &cb.Header{
-			ChainHeader: &cb.ChainHeader{
-				ChainID: chainID,
-				Type:    int32(cb.HeaderType_CONFIGURATION_TRANSACTION),
+			ChannelHeader: &cb.ChannelHeader{
+				ChannelId: chainID,
+				Type:      int32(cb.HeaderType_CONFIGURATION_TRANSACTION),
 			},
 		},
 	}
@@ -116,8 +116,8 @@ func makeMessage(chainID string, data []byte) *cb.Envelope {
 	payload := &cb.Payload{
 		Data: data,
 		Header: &cb.Header{
-			ChainHeader: &cb.ChainHeader{
-				ChainID: chainID,
+			ChannelHeader: &cb.ChannelHeader{
+				ChannelId: chainID,
 			},
 		},
 	}
@@ -198,7 +198,7 @@ func TestEmptyEnvelope(t *testing.T) {
 	}
 }
 
-func TestBadChainID(t *testing.T) {
+func TestBadChannelId(t *testing.T) {
 	mm, _ := getMockSupportManager()
 	bh := NewHandlerImpl(mm)
 	m := newMockB()
@@ -222,15 +222,15 @@ func TestBadChainID(t *testing.T) {
 	}
 }
 
-func TestNewChainID(t *testing.T) {
+func TestNewChannelId(t *testing.T) {
 	mm, _ := getMockSupportManager()
 	bh := NewHandlerImpl(mm)
 	m := newMockB()
 	defer close(m.recvChan)
 	go bh.Handle(m)
-	newChainID := "New Chain"
+	newChannelId := "New Chain"
 
-	m.recvChan <- makeConfigMessage(newChainID)
+	m.recvChan <- makeConfigMessage(newChannelId)
 	reply := <-m.sendChan
 	if reply.Status != cb.Status_SUCCESS {
 		t.Fatalf("Should have created a new chain, got %d", reply.Status)
@@ -240,7 +240,7 @@ func TestNewChainID(t *testing.T) {
 		t.Fatalf("Should have created a new chain")
 	}
 
-	m.recvChan <- makeMessage(newChainID, []byte("Some bytes"))
+	m.recvChan <- makeMessage(newChannelId, []byte("Some bytes"))
 	reply = <-m.sendChan
 	if reply.Status != cb.Status_SUCCESS {
 		t.Fatalf("Should have successfully sent message to new chain, got %v", reply)

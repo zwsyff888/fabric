@@ -131,8 +131,8 @@ func makeSeek(chainID string, seekInfo *ab.SeekInfo) *cb.Envelope {
 	return &cb.Envelope{
 		Payload: utils.MarshalOrPanic(&cb.Payload{
 			Header: &cb.Header{
-				ChainHeader: &cb.ChainHeader{
-					ChainID: chainID,
+				ChannelHeader: &cb.ChannelHeader{
+					ChannelId: chainID,
 				},
 				SignatureHeader: &cb.SignatureHeader{},
 			},

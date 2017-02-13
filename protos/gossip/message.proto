@@ -13,7 +13,13 @@ service Gossip {
 
     // Ping is used to probe a remote peer's aliveness
     rpc Ping (Empty) returns (Empty) {}
+}
 
+// GossipMessage contains a marshalled
+// GossipMessage and a signature over it.
+message SignedGossipMessage {
+    bytes payload   = 1;
+    bytes signature = 2;
 }
 
 // GossipMessage defines the message sent in a gossip network
@@ -225,6 +231,19 @@ message Member {
     string endpoint = 1;
     bytes  metadata = 2;
     bytes  pkiID    = 3;
+    // internalEndpoint is used to connect to the peer
+    // if its in your own organization
+    SignedEndpoint internalEndpoint = 4;
+}
+
+// SignedEndpoint is an endpoint that has a signature
+// on it. The signature needs to be verified
+// by the relevant certificate of the peer
+// that sent the message the SignedEndpoint
+// is part of.
+message SignedEndpoint {
+    string endpoint = 1;
+    bytes signature = 2;
 }
 
 // Empty is used for pinging and in tests
