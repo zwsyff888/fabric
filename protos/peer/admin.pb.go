@@ -7,19 +7,22 @@ Package peer is a generated protocol buffer package.
 
 It is generated from these files:
 	peer/admin.proto
-	peer/chaincode.proto
 	peer/chaincodeevent.proto
+	peer/chaincode.proto
 	peer/configuration.proto
 	peer/events.proto
 	peer/peer.proto
+	peer/processMessage.proto
 	peer/proposal.proto
 	peer/proposal_response.proto
+	peer/server_supervise.proto
 	peer/transaction.proto
 
 It has these top-level messages:
 	ServerStatus
 	LogLevelRequest
 	LogLevelResponse
+	ChaincodeEvent
 	ChaincodeID
 	ChaincodeInput
 	ChaincodeSpec
@@ -34,7 +37,6 @@ It has these top-level messages:
 	QueryStateClose
 	QueryStateKeyValue
 	QueryStateResponse
-	ChaincodeEvent
 	AnchorPeers
 	AnchorPeer
 	ChaincodeReg
@@ -46,6 +48,15 @@ It has these top-level messages:
 	Event
 	PeerID
 	PeerEndpoint
+	QueryBlocks
+	ChannelMessage
+	MessageInput
+	Mblock
+	MblockHeader
+	MblockData
+	TransData
+	MblockMetadata
+	MessageOutput
 	SignedProposal
 	Proposal
 	ChaincodeHeaderExtension
@@ -55,6 +66,9 @@ It has these top-level messages:
 	Response
 	ProposalResponsePayload
 	Endorsement
+	PeerReply
+	ConnectPeer
+	PeerInfo
 	SignedTransaction
 	ProcessedTransaction
 	Transaction

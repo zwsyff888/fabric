@@ -31,7 +31,7 @@ type SignedTransaction struct {
 func (m *SignedTransaction) Reset()                    { *m = SignedTransaction{} }
 func (m *SignedTransaction) String() string            { return proto.CompactTextString(m) }
 func (*SignedTransaction) ProtoMessage()               {}
-func (*SignedTransaction) Descriptor() ([]byte, []int) { return fileDescriptor8, []int{0} }
+func (*SignedTransaction) Descriptor() ([]byte, []int) { return fileDescriptor10, []int{0} }
 
 // ProcessedTransaction wraps an Envelope that includes a transaction along with an indication
 // of whether the transaction was validated or invalidated by committing peer.
@@ -49,7 +49,7 @@ type ProcessedTransaction struct {
 func (m *ProcessedTransaction) Reset()                    { *m = ProcessedTransaction{} }
 func (m *ProcessedTransaction) String() string            { return proto.CompactTextString(m) }
 func (*ProcessedTransaction) ProtoMessage()               {}
-func (*ProcessedTransaction) Descriptor() ([]byte, []int) { return fileDescriptor8, []int{1} }
+func (*ProcessedTransaction) Descriptor() ([]byte, []int) { return fileDescriptor10, []int{1} }
 
 func (m *ProcessedTransaction) GetTransactionEnvelope() *common.Envelope {
 	if m != nil {
@@ -84,7 +84,7 @@ type Transaction struct {
 func (m *Transaction) Reset()                    { *m = Transaction{} }
 func (m *Transaction) String() string            { return proto.CompactTextString(m) }
 func (*Transaction) ProtoMessage()               {}
-func (*Transaction) Descriptor() ([]byte, []int) { return fileDescriptor8, []int{2} }
+func (*Transaction) Descriptor() ([]byte, []int) { return fileDescriptor10, []int{2} }
 
 func (m *Transaction) GetTimestamp() *google_protobuf1.Timestamp {
 	if m != nil {
@@ -113,7 +113,7 @@ type TransactionAction struct {
 func (m *TransactionAction) Reset()                    { *m = TransactionAction{} }
 func (m *TransactionAction) String() string            { return proto.CompactTextString(m) }
 func (*TransactionAction) ProtoMessage()               {}
-func (*TransactionAction) Descriptor() ([]byte, []int) { return fileDescriptor8, []int{3} }
+func (*TransactionAction) Descriptor() ([]byte, []int) { return fileDescriptor10, []int{3} }
 
 // ChaincodeActionPayload is the message to be used for the TransactionAction's
 // payload when the Header's type is set to CHAINCODE.  It carries the
@@ -136,7 +136,7 @@ type ChaincodeActionPayload struct {
 func (m *ChaincodeActionPayload) Reset()                    { *m = ChaincodeActionPayload{} }
 func (m *ChaincodeActionPayload) String() string            { return proto.CompactTextString(m) }
 func (*ChaincodeActionPayload) ProtoMessage()               {}
-func (*ChaincodeActionPayload) Descriptor() ([]byte, []int) { return fileDescriptor8, []int{4} }
+func (*ChaincodeActionPayload) Descriptor() ([]byte, []int) { return fileDescriptor10, []int{4} }
 
 func (m *ChaincodeActionPayload) GetAction() *ChaincodeEndorsedAction {
 	if m != nil {
@@ -160,7 +160,7 @@ type ChaincodeEndorsedAction struct {
 func (m *ChaincodeEndorsedAction) Reset()                    { *m = ChaincodeEndorsedAction{} }
 func (m *ChaincodeEndorsedAction) String() string            { return proto.CompactTextString(m) }
 func (*ChaincodeEndorsedAction) ProtoMessage()               {}
-func (*ChaincodeEndorsedAction) Descriptor() ([]byte, []int) { return fileDescriptor8, []int{5} }
+func (*ChaincodeEndorsedAction) Descriptor() ([]byte, []int) { return fileDescriptor10, []int{5} }
 
 func (m *ChaincodeEndorsedAction) GetEndorsements() []*Endorsement {
 	if m != nil {
@@ -178,9 +178,9 @@ func init() {
 	proto.RegisterType((*ChaincodeEndorsedAction)(nil), "protos.ChaincodeEndorsedAction")
 }
 
-func init() { proto.RegisterFile("peer/transaction.proto", fileDescriptor8) }
+func init() { proto.RegisterFile("peer/transaction.proto", fileDescriptor10) }
 
-var fileDescriptor8 = []byte{
+var fileDescriptor10 = []byte{
 	// 449 bytes of a gzipped FileDescriptorProto
 	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x09, 0x6e, 0x88, 0x02, 0xff, 0x74, 0x53, 0x4d, 0x6b, 0xdb, 0x40,
 	0x14, 0x44, 0x09, 0x71, 0x9a, 0xe7, 0x1c, 0xe2, 0x75, 0x70, 0x14, 0x13, 0x48, 0xd0, 0x29, 0x25,

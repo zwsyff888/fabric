@@ -5,5 +5,7 @@ COPY payload/orderer /usr/local/bin
 ADD  payload/msp-sampleconfig.tar.bz2 $ORDERER_CFG_PATH/../
 COPY payload/orderer.yaml $ORDERER_CFG_PATH/
 COPY payload/genesis.yaml $ORDERER_CFG_PATH/
+RUN mkdir -p /etc/hyperledger/fabric/orderer/src/github.com/hyperledger/fabric/common/configtx/tool/
+COPY payload/genesis.yaml /etc/hyperledger/fabric/orderer/src/github.com/hyperledger/fabric/common/configtx/tool/
 EXPOSE 7050
 CMD orderer
