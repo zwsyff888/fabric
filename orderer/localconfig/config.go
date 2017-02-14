@@ -23,6 +23,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/hyperledger/fabric/common/viperutil"
+
 	"github.com/Shopify/sarama"
 	"github.com/op/go-logging"
 	"github.com/spf13/viper"
@@ -50,6 +52,7 @@ type General struct {
 	Profile       Profile
 	LogLevel      string
 	LocalMSPDir   string
+	LocalMSPID    string
 }
 
 //TLS contains config used to configure TLS
@@ -62,19 +65,14 @@ type TLS struct {
 	ClientRootCAs     []string
 }
 
-// Genesis contains config which is used by the provisional bootstrapper
+// Genesis is a deprecated structure which was used to put
+// values into the genesis block, but this is now handled elsewhere
+// SBFT did not reference these values via the genesis block however
+// so it is being left here for backwards compatibility purposes
 type Genesis struct {
-	OrdererType  string
-	BatchTimeout time.Duration
-	BatchSize    BatchSize
-	SbftShared   SbftShared
-}
-
-// BatchSize contains configuration affecting the size of batches
-type BatchSize struct {
-	MaxMessageCount   uint32
-	AbsoluteMaxBytes  uint32
-	PreferredMaxBytes uint32
+	DeprecatedBatchTimeout time.Duration
+	DeprecatedBatchSize    uint32
+	SbftShared             SbftShared
 }
 
 // Profile contains configuration for Go pprof profiling
@@ -96,7 +94,6 @@ type FileLedger struct {
 
 // Kafka contains config for the Kafka orderer
 type Kafka struct {
-	Brokers []string // TODO This should be deprecated and this information should be stored in the config block
 	Retry   Retry
 	Verbose bool
 	Version sarama.KafkaVersion
@@ -123,6 +120,11 @@ type SbftShared struct {
 type Retry struct {
 	Period time.Duration
 	Stop   time.Duration
+}
+
+type RuntimeAndGenesis struct {
+	runtime *TopLevel
+	genesis *Genesis
 }
 
 // TopLevel directly corresponds to the orderer config yaml
@@ -154,6 +156,7 @@ var defaults = TopLevel{
 		},
 		LogLevel:    "INFO",
 		LocalMSPDir: "../msp/sampleconfig/",
+		LocalMSPID:  "DEFAULT",
 	},
 	RAMLedger: RAMLedger{
 		HistorySize: 10000,
@@ -163,7 +166,6 @@ var defaults = TopLevel{
 		Prefix:   "hyperledger-fabric-ordererledger",
 	},
 	Kafka: Kafka{
-		Brokers: []string{"127.0.0.1:9092"},
 		Retry: Retry{
 			Period: 3 * time.Second,
 			Stop:   60 * time.Second,
@@ -175,13 +177,6 @@ var defaults = TopLevel{
 		},
 	},
 	Genesis: Genesis{
-		OrdererType:  "solo",
-		BatchTimeout: 10 * time.Second,
-		BatchSize: BatchSize{
-			MaxMessageCount:   10,
-			AbsoluteMaxBytes:  100000000,
-			PreferredMaxBytes: 512 * 1024,
-		},
 		SbftShared: SbftShared{
 			N:                  1,
 			F:                  0,
@@ -239,33 +234,18 @@ func (c *TopLevel) completeInitialization() {
 			// the file is initialized, so we cannot initialize this in the structure, so we
 			// deference the env portion here
 			c.General.LocalMSPDir = filepath.Join(os.Getenv("ORDERER_CFG_PATH"), defaults.General.LocalMSPDir)
+		case c.General.LocalMSPID == "":
+			logger.Infof("General.LocalMSPID unset, setting to %s", defaults.General.LocalMSPID)
+			c.General.LocalMSPID = defaults.General.LocalMSPID
 		case c.FileLedger.Prefix == "":
 			logger.Infof("FileLedger.Prefix unset, setting to %s", defaults.FileLedger.Prefix)
 			c.FileLedger.Prefix = defaults.FileLedger.Prefix
-		case c.Kafka.Brokers == nil:
-			logger.Infof("Kafka.Brokers unset, setting to %v", defaults.Kafka.Brokers)
-			c.Kafka.Brokers = defaults.Kafka.Brokers
 		case c.Kafka.Retry.Period == 0*time.Second:
 			logger.Infof("Kafka.Retry.Period unset, setting to %v", defaults.Kafka.Retry.Period)
 			c.Kafka.Retry.Period = defaults.Kafka.Retry.Period
 		case c.Kafka.Retry.Stop == 0*time.Second:
 			logger.Infof("Kafka.Retry.Stop unset, setting to %v", defaults.Kafka.Retry.Stop)
 			c.Kafka.Retry.Stop = defaults.Kafka.Retry.Stop
-		case c.Genesis.OrdererType == "":
-			logger.Infof("Genesis.OrdererType unset, setting to %s", defaults.Genesis.OrdererType)
-			c.Genesis.OrdererType = defaults.Genesis.OrdererType
-		case c.Genesis.BatchTimeout == 0:
-			logger.Infof("Genesis.BatchTimeout unset, setting to %s", defaults.Genesis.BatchTimeout)
-			c.Genesis.BatchTimeout = defaults.Genesis.BatchTimeout
-		case c.Genesis.BatchSize.MaxMessageCount == 0:
-			logger.Infof("Genesis.BatchSize.MaxMessageCount unset, setting to %s", defaults.Genesis.BatchSize.MaxMessageCount)
-			c.Genesis.BatchSize.MaxMessageCount = defaults.Genesis.BatchSize.MaxMessageCount
-		case c.Genesis.BatchSize.AbsoluteMaxBytes == 0:
-			logger.Infof("Genesis.BatchSize.AbsoluteMaxBytes unset, setting to %s", defaults.Genesis.BatchSize.AbsoluteMaxBytes)
-			c.Genesis.BatchSize.AbsoluteMaxBytes = defaults.Genesis.BatchSize.AbsoluteMaxBytes
-		case c.Genesis.BatchSize.PreferredMaxBytes == 0:
-			logger.Infof("Genesis.BatchSize.PreferredMaxBytes unset, setting to %s", defaults.Genesis.BatchSize.PreferredMaxBytes)
-			c.Genesis.BatchSize.PreferredMaxBytes = defaults.Genesis.BatchSize.PreferredMaxBytes
 		default:
 			// A bit hacky, but its type makes it impossible to test for a nil value.
 			// This may be overwritten by the Kafka orderer upon instantiation.
@@ -314,7 +294,7 @@ func Load() *TopLevel {
 
 	var uconf TopLevel
 
-	err = ExactWithDateUnmarshal(config, &uconf)
+	err = viperutil.EnhancedExactUnmarshal(config, &uconf)
 	if err != nil {
 		panic(fmt.Errorf("Error unmarshaling into structure: %s", err))
 	}

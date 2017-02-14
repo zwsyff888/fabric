@@ -20,17 +20,17 @@ import (
 	"io/ioutil"
 	"os"
 
-	"github.com/hyperledger/fabric/orderer/common/bootstrap/provisional"
+	genesisconfig "github.com/hyperledger/fabric/common/configtx/tool/localconfig"
+	"github.com/hyperledger/fabric/common/configtx/tool/provisional"
 	. "github.com/hyperledger/fabric/orderer/ledger"
 	fileledger "github.com/hyperledger/fabric/orderer/ledger/file"
-	"github.com/hyperledger/fabric/orderer/localconfig"
 	cb "github.com/hyperledger/fabric/protos/common"
 )
 
 var genesisBlock *cb.Block
 
 func init() {
-	genesisBlock = provisional.New(config.Load()).GenesisBlock()
+	genesisBlock = provisional.New(genesisconfig.Load()).GenesisBlock()
 	testables = append(testables, &fileLedgerTestEnv{})
 }
 

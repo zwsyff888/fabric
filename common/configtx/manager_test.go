@@ -17,53 +17,27 @@ limitations under the License.
 package configtx
 
 import (
-	"errors"
 	"fmt"
 	"testing"
 
 	"github.com/hyperledger/fabric/common/configtx/api"
 	mockconfigtx "github.com/hyperledger/fabric/common/mocks/configtx"
-	"github.com/hyperledger/fabric/common/policies"
+	mockpolicies "github.com/hyperledger/fabric/common/mocks/policies"
 	cb "github.com/hyperledger/fabric/protos/common"
 	"github.com/hyperledger/fabric/protos/utils"
 )
 
 var defaultChain = "DefaultChainID"
 
-func defaultHandlers() map[cb.ConfigItem_ConfigType]api.Handler {
-	handlers := make(map[cb.ConfigItem_ConfigType]api.Handler)
-	for ctype := range cb.ConfigItem_ConfigType_name {
-		handlers[cb.ConfigItem_ConfigType(ctype)] = NewBytesHandler()
+func defaultInitializer() *mockconfigtx.Initializer {
+	return &mockconfigtx.Initializer{
+		Resources: mockconfigtx.Resources{
+			PolicyManagerVal: &mockpolicies.Manager{
+				Policy: &mockpolicies.Policy{},
+			},
+		},
+		HandlerVal: &mockconfigtx.Handler{},
 	}
-	return handlers
-}
-
-// mockPolicy always returns the error set as policyResult
-type mockPolicy struct {
-	policyResult error
-	// validReplies is the number of times to successfully validate before returning policyResult
-	// it is decremented at each invocation
-	validReplies int
-}
-
-func (mp *mockPolicy) Evaluate(signedData []*cb.SignedData) error {
-	if mp == nil {
-		return errors.New("Invoked nil policy")
-	}
-	if mp.validReplies > 0 {
-		return nil
-	}
-	mp.validReplies--
-	return mp.policyResult
-}
-
-// mockPolicyManager always returns the policy set as policy, note that if unset, the default policy always returns error when evaluated
-type mockPolicyManager struct {
-	policy *mockPolicy
-}
-
-func (mpm *mockPolicyManager) GetPolicy(id string) (policies.Policy, bool) {
-	return mpm.policy, (mpm.policy != nil)
 }
 
 func makeConfigItem(id, modificationPolicy string, lastModified uint64, data []byte) *cb.ConfigItem {
@@ -76,22 +50,22 @@ func makeConfigItem(id, modificationPolicy string, lastModified uint64, data []b
 }
 
 func makeMarshaledConfig(chainID string, configItems ...*cb.ConfigItem) []byte {
-	config := &cb.Config{
+	values := make(map[string]*cb.ConfigValue)
+	for _, item := range configItems {
+		values[item.Key] = &cb.ConfigValue{
+			Version:   item.LastModified,
+			ModPolicy: item.ModificationPolicy,
+			Value:     item.Value,
+		}
+	}
+
+	config := &cb.ConfigNext{
 		Header: &cb.ChannelHeader{ChannelId: chainID},
-		Items:  configItems,
+		Channel: &cb.ConfigGroup{
+			Values: values,
+		},
 	}
 	return utils.MarshalOrPanic(config)
-}
-
-// TestOmittedHandler tests that startup fails if not all config types have an associated handler
-func TestOmittedHandler(t *testing.T) {
-	_, err := NewManagerImpl(&cb.ConfigEnvelope{
-		Config: makeMarshaledConfig(defaultChain, makeConfigItem("foo", "foo", 0, []byte("foo"))),
-	}, &mockconfigtx.Initializer{PolicyManagerVal: &mockPolicyManager{&mockPolicy{}}, HandlersVal: map[cb.ConfigItem_ConfigType]api.Handler{}}, nil)
-
-	if err == nil {
-		t.Fatal("Should have failed to construct manager because handlers were missing")
-	}
 }
 
 func TestCallback(t *testing.T) {
@@ -102,7 +76,7 @@ func TestCallback(t *testing.T) {
 
 	cm, err := NewManagerImpl(&cb.ConfigEnvelope{
 		Config: makeMarshaledConfig(defaultChain, makeConfigItem("foo", "foo", 0, []byte("foo"))),
-	}, &mockconfigtx.Initializer{PolicyManagerVal: &mockPolicyManager{&mockPolicy{}}, HandlersVal: defaultHandlers()}, []func(api.Manager){callback})
+	}, defaultInitializer(), []func(api.Manager){callback})
 
 	if err != nil {
 		t.Fatalf("Error constructing config manager: %s", err)
@@ -117,7 +91,7 @@ func TestCallback(t *testing.T) {
 func TestDifferentChainID(t *testing.T) {
 	cm, err := NewManagerImpl(&cb.ConfigEnvelope{
 		Config: makeMarshaledConfig(defaultChain, makeConfigItem("foo", "foo", 0, []byte("foo"))),
-	}, &mockconfigtx.Initializer{PolicyManagerVal: &mockPolicyManager{&mockPolicy{}}, HandlersVal: defaultHandlers()}, nil)
+	}, defaultInitializer(), nil)
 
 	if err != nil {
 		t.Fatalf("Error constructing config manager: %s", err)
@@ -142,7 +116,7 @@ func TestDifferentChainID(t *testing.T) {
 func TestOldConfigReplay(t *testing.T) {
 	cm, err := NewManagerImpl(&cb.ConfigEnvelope{
 		Config: makeMarshaledConfig(defaultChain, makeConfigItem("foo", "foo", 0, []byte("foo"))),
-	}, &mockconfigtx.Initializer{PolicyManagerVal: &mockPolicyManager{&mockPolicy{}}, HandlersVal: defaultHandlers()}, nil)
+	}, defaultInitializer(), nil)
 
 	if err != nil {
 		t.Fatalf("Error constructing config manager: %s", err)
@@ -167,7 +141,7 @@ func TestOldConfigReplay(t *testing.T) {
 func TestInvalidInitialConfigByStructure(t *testing.T) {
 	_, err := NewManagerImpl(&cb.ConfigEnvelope{
 		Config: []byte("Corrupted"),
-	}, &mockconfigtx.Initializer{PolicyManagerVal: &mockPolicyManager{&mockPolicy{}}, HandlersVal: defaultHandlers()}, nil)
+	}, defaultInitializer(), nil)
 
 	if err == nil {
 		t.Fatal("Should have failed to construct config by policy")
@@ -178,7 +152,7 @@ func TestInvalidInitialConfigByStructure(t *testing.T) {
 func TestValidConfigChange(t *testing.T) {
 	cm, err := NewManagerImpl(&cb.ConfigEnvelope{
 		Config: makeMarshaledConfig(defaultChain, makeConfigItem("foo", "foo", 0, []byte("foo"))),
-	}, &mockconfigtx.Initializer{PolicyManagerVal: &mockPolicyManager{&mockPolicy{}}, HandlersVal: defaultHandlers()}, nil)
+	}, defaultInitializer(), nil)
 
 	if err != nil {
 		t.Fatalf("Error constructing config manager: %s", err)
@@ -204,7 +178,7 @@ func TestValidConfigChange(t *testing.T) {
 func TestConfigChangeRegressedSequence(t *testing.T) {
 	cm, err := NewManagerImpl(&cb.ConfigEnvelope{
 		Config: makeMarshaledConfig(defaultChain, makeConfigItem("foo", "foo", 1, []byte("foo"))),
-	}, &mockconfigtx.Initializer{PolicyManagerVal: &mockPolicyManager{&mockPolicy{}}, HandlersVal: defaultHandlers()}, nil)
+	}, defaultInitializer(), nil)
 
 	if err != nil {
 		t.Fatalf("Error constructing config manager: %s", err)
@@ -234,7 +208,7 @@ func TestConfigChangeRegressedSequence(t *testing.T) {
 func TestConfigChangeOldSequence(t *testing.T) {
 	cm, err := NewManagerImpl(&cb.ConfigEnvelope{
 		Config: makeMarshaledConfig(defaultChain, makeConfigItem("foo", "foo", 1, []byte("foo"))),
-	}, &mockconfigtx.Initializer{PolicyManagerVal: &mockPolicyManager{&mockPolicy{}}, HandlersVal: defaultHandlers()}, nil)
+	}, defaultInitializer(), nil)
 
 	if err != nil {
 		t.Fatalf("Error constructing config manager: %s", err)
@@ -268,7 +242,7 @@ func TestConfigImplicitDelete(t *testing.T) {
 			makeConfigItem("foo", "foo", 0, []byte("foo")),
 			makeConfigItem("bar", "bar", 0, []byte("bar")),
 		),
-	}, &mockconfigtx.Initializer{PolicyManagerVal: &mockPolicyManager{&mockPolicy{}}, HandlersVal: defaultHandlers()}, nil)
+	}, defaultInitializer(), nil)
 
 	if err != nil {
 		t.Fatalf("Error constructing config manager: %s", err)
@@ -296,7 +270,7 @@ func TestConfigImplicitDelete(t *testing.T) {
 func TestEmptyConfigUpdate(t *testing.T) {
 	cm, err := NewManagerImpl(&cb.ConfigEnvelope{
 		Config: makeMarshaledConfig(defaultChain, makeConfigItem("foo", "foo", 0, []byte("foo"))),
-	}, &mockconfigtx.Initializer{PolicyManagerVal: &mockPolicyManager{&mockPolicy{}}, HandlersVal: defaultHandlers()}, nil)
+	}, defaultInitializer(), nil)
 
 	if err != nil {
 		t.Fatalf("Error constructing config manager: %s", err)
@@ -325,7 +299,7 @@ func TestSilentConfigModification(t *testing.T) {
 			makeConfigItem("foo", "foo", 0, []byte("foo")),
 			makeConfigItem("bar", "bar", 0, []byte("bar")),
 		),
-	}, &mockconfigtx.Initializer{PolicyManagerVal: &mockPolicyManager{&mockPolicy{}}, HandlersVal: defaultHandlers()}, nil)
+	}, defaultInitializer(), nil)
 
 	if err != nil {
 		t.Fatalf("Error constructing config manager: %s", err)
@@ -353,9 +327,11 @@ func TestSilentConfigModification(t *testing.T) {
 // TestInvalidInitialConfigByPolicy tests to make sure that if an existing policies does not validate the config that
 // even construction fails
 func TestInvalidInitialConfigByPolicy(t *testing.T) {
+	initializer := defaultInitializer()
+	initializer.Resources.PolicyManagerVal.Policy.Err = fmt.Errorf("err")
 	_, err := NewManagerImpl(&cb.ConfigEnvelope{
 		Config: makeMarshaledConfig(defaultChain, makeConfigItem("foo", "foo", 0, []byte("foo"))),
-	}, &mockconfigtx.Initializer{PolicyManagerVal: &mockPolicyManager{&mockPolicy{policyResult: fmt.Errorf("err")}}, HandlersVal: defaultHandlers()}, nil)
+	}, initializer, nil)
 
 	if err == nil {
 		t.Fatal("Should have failed to construct config by policy")
@@ -365,16 +341,16 @@ func TestInvalidInitialConfigByPolicy(t *testing.T) {
 // TestConfigChangeViolatesPolicy checks to make sure that if policy rejects the validation of a config item that
 // it is rejected in a config update
 func TestConfigChangeViolatesPolicy(t *testing.T) {
-	mpm := &mockPolicyManager{}
+	initializer := defaultInitializer()
 	cm, err := NewManagerImpl(&cb.ConfigEnvelope{
 		Config: makeMarshaledConfig(defaultChain, makeConfigItem("foo", "foo", 0, []byte("foo"))),
-	}, &mockconfigtx.Initializer{PolicyManagerVal: mpm, HandlersVal: defaultHandlers()}, nil)
+	}, initializer, nil)
 
 	if err != nil {
 		t.Fatalf("Error constructing config manager: %s", err)
 	}
 	// Set the mock policy to error
-	mpm.policy = &mockPolicy{policyResult: fmt.Errorf("err")}
+	initializer.Resources.PolicyManagerVal.Policy.Err = fmt.Errorf("err")
 
 	newConfig := &cb.ConfigEnvelope{
 		Config: makeMarshaledConfig(defaultChain, makeConfigItem("foo", "foo", 1, []byte("foo"))),
@@ -394,19 +370,18 @@ func TestConfigChangeViolatesPolicy(t *testing.T) {
 // TestUnchangedConfigViolatesPolicy checks to make sure that existing config items are not revalidated against their modification policies
 // as the policy may have changed, certs revoked, etc. since the config was adopted.
 func TestUnchangedConfigViolatesPolicy(t *testing.T) {
-	mpm := &mockPolicyManager{}
+	initializer := defaultInitializer()
 	cm, err := NewManagerImpl(&cb.ConfigEnvelope{
 		Config: makeMarshaledConfig(defaultChain, makeConfigItem("foo", "foo", 0, []byte("foo"))),
-	}, &mockconfigtx.Initializer{PolicyManagerVal: mpm, HandlersVal: defaultHandlers()}, nil)
+	}, initializer, nil)
 
 	if err != nil {
 		t.Fatalf("Error constructing config manager: %s", err)
 	}
+
 	// Set the mock policy to error
-	mpm.policy = &mockPolicy{
-		policyResult: fmt.Errorf("err"),
-		validReplies: 1,
-	}
+	initializer.Resources.PolicyManagerVal.PolicyMap = make(map[string]*mockpolicies.Policy)
+	initializer.Resources.PolicyManagerVal.PolicyMap["foo"] = &mockpolicies.Policy{Err: fmt.Errorf("err")}
 
 	newConfig := &cb.ConfigEnvelope{
 		Config: makeMarshaledConfig(
@@ -427,20 +402,10 @@ func TestUnchangedConfigViolatesPolicy(t *testing.T) {
 	}
 }
 
-type failHandler struct{}
-
-func (fh failHandler) BeginConfig()    {}
-func (fh failHandler) RollbackConfig() {}
-func (fh failHandler) CommitConfig()   {}
-func (fh failHandler) ProposeConfig(item *cb.ConfigItem) error {
-	return errors.New("Fail")
-}
-
 // TestInvalidProposal checks that even if the policy allows the transaction and the sequence etc. is well formed,
 // that if the handler does not accept the config, it is rejected
 func TestInvalidProposal(t *testing.T) {
-	handlers := defaultHandlers()
-	initializer := &mockconfigtx.Initializer{PolicyManagerVal: &mockPolicyManager{&mockPolicy{}}, HandlersVal: handlers}
+	initializer := defaultInitializer()
 	cm, err := NewManagerImpl(&cb.ConfigEnvelope{
 		Config: makeMarshaledConfig(defaultChain, makeConfigItem("foo", "foo", 0, []byte("foo"))),
 	}, initializer, nil)
@@ -449,7 +414,7 @@ func TestInvalidProposal(t *testing.T) {
 		t.Fatalf("Error constructing config manager: %s", err)
 	}
 
-	initializer.Handlers()[cb.ConfigItem_ConfigType(0)] = failHandler{}
+	initializer.HandlerVal = &mockconfigtx.Handler{ErrorForProposeConfig: fmt.Errorf("err")}
 
 	newConfig := &cb.ConfigEnvelope{
 		Config: makeMarshaledConfig(defaultChain, makeConfigItem("foo", "foo", 1, []byte("foo"))),
@@ -468,12 +433,11 @@ func TestInvalidProposal(t *testing.T) {
 
 // TestMissingHeader checks that a config item with a missing header causes the config to be rejected
 func TestMissingHeader(t *testing.T) {
-	handlers := defaultHandlers()
 	configItem := makeConfigItem("foo", "foo", 0, []byte("foo"))
 	data := utils.MarshalOrPanic(&cb.Config{Items: []*cb.ConfigItem{configItem}})
 	_, err := NewManagerImpl(&cb.ConfigEnvelope{
 		Config: data,
-	}, &mockconfigtx.Initializer{PolicyManagerVal: &mockPolicyManager{&mockPolicy{}}, HandlersVal: handlers}, nil)
+	}, defaultInitializer(), nil)
 
 	if err == nil {
 		t.Error("Should have errored creating the config manager because of the missing header")
@@ -482,10 +446,9 @@ func TestMissingHeader(t *testing.T) {
 
 // TestMissingChainID checks that a config item with a missing chainID causes the config to be rejected
 func TestMissingChainID(t *testing.T) {
-	handlers := defaultHandlers()
 	_, err := NewManagerImpl(&cb.ConfigEnvelope{
 		Config: makeMarshaledConfig("", makeConfigItem("foo", "foo", 0, []byte("foo"))),
-	}, &mockconfigtx.Initializer{PolicyManagerVal: &mockPolicyManager{&mockPolicy{}}, HandlersVal: handlers}, nil)
+	}, defaultInitializer(), nil)
 
 	if err == nil {
 		t.Error("Should have errored creating the config manager because of the missing header")

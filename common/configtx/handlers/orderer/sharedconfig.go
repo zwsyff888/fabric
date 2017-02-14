@@ -23,11 +23,18 @@ import (
 	"strings"
 	"time"
 
+	"github.com/hyperledger/fabric/common/configtx/api"
+	"github.com/hyperledger/fabric/common/configtx/handlers/msp"
 	cb "github.com/hyperledger/fabric/protos/common"
 	ab "github.com/hyperledger/fabric/protos/orderer"
 
 	"github.com/golang/protobuf/proto"
 	"github.com/op/go-logging"
+)
+
+const (
+	// GroupKey is the group name for the orderer config
+	GroupKey = "Orderer"
 )
 
 var orgSchema = &cb.ConfigGroupSchema{
@@ -97,12 +104,15 @@ type ordererConfig struct {
 type ManagerImpl struct {
 	pendingConfig *ordererConfig
 	config        *ordererConfig
+
+	mspConfig *msp.MSPConfigHandler
 }
 
 // NewManagerImpl creates a new ManagerImpl
-func NewManagerImpl() *ManagerImpl {
+func NewManagerImpl(mspConfig *msp.MSPConfigHandler) *ManagerImpl {
 	return &ManagerImpl{
-		config: &ordererConfig{},
+		config:    &ordererConfig{},
+		mspConfig: mspConfig,
 	}
 }
 
@@ -146,6 +156,7 @@ func (pm *ManagerImpl) EgressPolicyNames() []string {
 
 // BeginConfig is used to start a new config proposal
 func (pm *ManagerImpl) BeginConfig() {
+	logger.Debugf("Beginning possible new orderer config")
 	if pm.pendingConfig != nil {
 		logger.Fatalf("Programming error, cannot call begin in the middle of a proposal")
 	}
@@ -154,6 +165,7 @@ func (pm *ManagerImpl) BeginConfig() {
 
 // RollbackConfig is used to abandon a new config proposal
 func (pm *ManagerImpl) RollbackConfig() {
+	logger.Debugf("Rolling back orderer config")
 	pm.pendingConfig = nil
 }
 
@@ -170,15 +182,11 @@ func (pm *ManagerImpl) CommitConfig() {
 }
 
 // ProposeConfig is used to add new config to the config proposal
-func (pm *ManagerImpl) ProposeConfig(configItem *cb.ConfigItem) error {
-	if configItem.Type != cb.ConfigItem_ORDERER {
-		return fmt.Errorf("Expected type of ConfigItem_Orderer, got %v", configItem.Type)
-	}
-
-	switch configItem.Key {
+func (pm *ManagerImpl) ProposeConfig(key string, configValue *cb.ConfigValue) error {
+	switch key {
 	case ConsensusTypeKey:
 		consensusType := &ab.ConsensusType{}
-		if err := proto.Unmarshal(configItem.Value, consensusType); err != nil {
+		if err := proto.Unmarshal(configValue.Value, consensusType); err != nil {
 			return fmt.Errorf("Unmarshaling error for ConsensusType: %s", err)
 		}
 		if pm.config.consensusType == "" {
@@ -191,7 +199,7 @@ func (pm *ManagerImpl) ProposeConfig(configItem *cb.ConfigItem) error {
 		pm.pendingConfig.consensusType = consensusType.Type
 	case BatchSizeKey:
 		batchSize := &ab.BatchSize{}
-		if err := proto.Unmarshal(configItem.Value, batchSize); err != nil {
+		if err := proto.Unmarshal(configValue.Value, batchSize); err != nil {
 			return fmt.Errorf("Unmarshaling error for BatchSize: %s", err)
 		}
 		if batchSize.MaxMessageCount == 0 {
@@ -211,7 +219,7 @@ func (pm *ManagerImpl) ProposeConfig(configItem *cb.ConfigItem) error {
 		var timeoutValue time.Duration
 		var err error
 		batchTimeout := &ab.BatchTimeout{}
-		if err = proto.Unmarshal(configItem.Value, batchTimeout); err != nil {
+		if err = proto.Unmarshal(configValue.Value, batchTimeout); err != nil {
 			return fmt.Errorf("Unmarshaling error for BatchTimeout: %s", err)
 		}
 		if timeoutValue, err = time.ParseDuration(batchTimeout.Timeout); err != nil {
@@ -223,7 +231,7 @@ func (pm *ManagerImpl) ProposeConfig(configItem *cb.ConfigItem) error {
 		pm.pendingConfig.batchTimeout = timeoutValue
 	case ChainCreationPolicyNamesKey:
 		chainCreationPolicyNames := &ab.ChainCreationPolicyNames{}
-		if err := proto.Unmarshal(configItem.Value, chainCreationPolicyNames); err != nil {
+		if err := proto.Unmarshal(configValue.Value, chainCreationPolicyNames); err != nil {
 			return fmt.Errorf("Unmarshaling error for ChainCreator: %s", err)
 		}
 		if chainCreationPolicyNames.Names == nil {
@@ -235,19 +243,19 @@ func (pm *ManagerImpl) ProposeConfig(configItem *cb.ConfigItem) error {
 		}
 	case IngressPolicyNamesKey:
 		ingressPolicyNames := &ab.IngressPolicyNames{}
-		if err := proto.Unmarshal(configItem.Value, ingressPolicyNames); err != nil {
+		if err := proto.Unmarshal(configValue.Value, ingressPolicyNames); err != nil {
 			return fmt.Errorf("Unmarshaling error for IngressPolicyNames: %s", err)
 		}
 		pm.pendingConfig.ingressPolicyNames = ingressPolicyNames.Names
 	case EgressPolicyNamesKey:
 		egressPolicyNames := &ab.EgressPolicyNames{}
-		if err := proto.Unmarshal(configItem.Value, egressPolicyNames); err != nil {
+		if err := proto.Unmarshal(configValue.Value, egressPolicyNames); err != nil {
 			return fmt.Errorf("Unmarshaling error for EgressPolicyNames: %s", err)
 		}
 		pm.pendingConfig.egressPolicyNames = egressPolicyNames.Names
 	case KafkaBrokersKey:
 		kafkaBrokers := &ab.KafkaBrokers{}
-		if err := proto.Unmarshal(configItem.Value, kafkaBrokers); err != nil {
+		if err := proto.Unmarshal(configValue.Value, kafkaBrokers); err != nil {
 			return fmt.Errorf("Unmarshaling error for KafkaBrokers: %s", err)
 		}
 		if len(kafkaBrokers.Brokers) == 0 {
@@ -263,7 +271,20 @@ func (pm *ManagerImpl) ProposeConfig(configItem *cb.ConfigItem) error {
 	return nil
 }
 
-// This does just a barebones sanitfy check.
+// Handler returns the associated api.Handler for the given path
+func (pm *ManagerImpl) Handler(path []string) (api.Handler, error) {
+	if len(path) == 0 {
+		return pm, nil
+	}
+
+	if len(path) > 1 {
+		return nil, fmt.Errorf("Orderer group allows only one further level of nesting")
+	}
+
+	return pm.mspConfig.Handler(path[1:])
+}
+
+// This does just a barebones sanity check.
 func brokerEntrySeemsValid(broker string) bool {
 	if !strings.Contains(broker, ":") {
 		return false

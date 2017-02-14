@@ -23,8 +23,8 @@ import (
 	"time"
 
 	"github.com/Shopify/sarama"
+	"github.com/hyperledger/fabric/common/configtx/tool/provisional"
 	mockconfigtxorderer "github.com/hyperledger/fabric/common/mocks/configtx/handlers/orderer"
-	"github.com/hyperledger/fabric/orderer/common/bootstrap/provisional"
 	"github.com/hyperledger/fabric/orderer/localconfig"
 	mockblockcutter "github.com/hyperledger/fabric/orderer/mocks/blockcutter"
 	mockmultichain "github.com/hyperledger/fabric/orderer/mocks/multichain"
@@ -37,7 +37,7 @@ import (
 var cp = newChainPartition(provisional.TestChainID, rawPartition)
 
 func newMockSharedConfigManager() *mockconfigtxorderer.SharedConfig {
-	return &mockconfigtxorderer.SharedConfig{KafkaBrokersVal: testConf.Kafka.Brokers}
+	return &mockconfigtxorderer.SharedConfig{KafkaBrokersVal: testGenesisConf.Orderer.Kafka.Brokers}
 }
 
 type mockConsenterImpl struct {

@@ -19,11 +19,18 @@ package application
 import (
 	"fmt"
 
+	"github.com/hyperledger/fabric/common/configtx/api"
+	"github.com/hyperledger/fabric/common/configtx/handlers/msp"
 	cb "github.com/hyperledger/fabric/protos/common"
 	pb "github.com/hyperledger/fabric/protos/peer"
 
 	"github.com/golang/protobuf/proto"
 	"github.com/op/go-logging"
+)
+
+const (
+	// GroupKey is the group name for the Application config
+	GroupKey = "Application"
 )
 
 var orgSchema = &cb.ConfigGroupSchema{
@@ -50,7 +57,7 @@ var Schema = &cb.ConfigGroupSchema{
 
 // Peer config keys
 const (
-	// AnchorPeersKey is the cb.ConfigItem type key name for the AnchorPeers message
+	// AnchorPeersKey is the key name for the AnchorPeers ConfigValue
 	AnchorPeersKey = "AnchorPeers"
 )
 
@@ -65,12 +72,15 @@ type sharedConfig struct {
 type SharedConfigImpl struct {
 	pendingConfig *sharedConfig
 	config        *sharedConfig
+
+	mspConfig *msp.MSPConfigHandler
 }
 
 // NewSharedConfigImpl creates a new SharedConfigImpl with the given CryptoHelper
-func NewSharedConfigImpl() *SharedConfigImpl {
+func NewSharedConfigImpl(mspConfig *msp.MSPConfigHandler) *SharedConfigImpl {
 	return &SharedConfigImpl{
-		config: &sharedConfig{},
+		config:    &sharedConfig{},
+		mspConfig: mspConfig,
 	}
 }
 
@@ -105,23 +115,32 @@ func (di *SharedConfigImpl) CommitConfig() {
 }
 
 // ProposeConfig is used to add new config to the config proposal
-func (di *SharedConfigImpl) ProposeConfig(configItem *cb.ConfigItem) error {
-	if configItem.Type != cb.ConfigItem_PEER {
-		return fmt.Errorf("Expected type of ConfigItem_Peer, got %v", configItem.Type)
-	}
-
-	switch configItem.Key {
+func (di *SharedConfigImpl) ProposeConfig(key string, configValue *cb.ConfigValue) error {
+	switch key {
 	case AnchorPeersKey:
 		anchorPeers := &pb.AnchorPeers{}
-		if err := proto.Unmarshal(configItem.Value, anchorPeers); err != nil {
-			return fmt.Errorf("Unmarshaling error for %s: %s", configItem.Key, err)
+		if err := proto.Unmarshal(configValue.Value, anchorPeers); err != nil {
+			return fmt.Errorf("Unmarshaling error for %s: %s", key, err)
 		}
 		if logger.IsEnabledFor(logging.DEBUG) {
-			logger.Debugf("Setting %s to %v", configItem.Key, anchorPeers.AnchorPeers)
+			logger.Debugf("Setting %s to %v", key, anchorPeers.AnchorPeers)
 		}
 		di.pendingConfig.anchorPeers = anchorPeers.AnchorPeers
 	default:
-		logger.Warningf("Uknown Peer config item with key %s", configItem.Key)
+		logger.Warningf("Uknown Peer config item with key %s", key)
 	}
 	return nil
+}
+
+// Handler returns the associated api.Handler for the given path
+func (pm *SharedConfigImpl) Handler(path []string) (api.Handler, error) {
+	if len(path) == 0 {
+		return pm, nil
+	}
+
+	if len(path) > 1 {
+		return nil, fmt.Errorf("Application group allows only one further level of nesting")
+	}
+
+	return pm.mspConfig.Handler(path[1:])
 }

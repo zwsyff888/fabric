@@ -31,16 +31,21 @@ func init() {
 	logging.SetLevel(logging.DEBUG, "")
 }
 
-func makeInvalidConfigItem(key string) *cb.ConfigItem {
-	return &cb.ConfigItem{
-		Type:  cb.ConfigItem_PEER,
-		Key:   key,
+func makeInvalidConfigValue() *cb.ConfigValue {
+	return &cb.ConfigValue{
 		Value: []byte("Garbage Data"),
 	}
 }
 
+func groupToKeyValue(configGroup *cb.ConfigGroup) (string, *cb.ConfigValue) {
+	for key, value := range configGroup.Groups[GroupKey].Values {
+		return key, value
+	}
+	panic("No value encoded")
+}
+
 func TestInterface(t *testing.T) {
-	_ = configtxapi.ApplicationConfig(NewSharedConfigImpl())
+	_ = configtxapi.ApplicationConfig(NewSharedConfigImpl(nil))
 }
 
 func TestDoubleBegin(t *testing.T) {
@@ -50,7 +55,7 @@ func TestDoubleBegin(t *testing.T) {
 		}
 	}()
 
-	m := NewSharedConfigImpl()
+	m := NewSharedConfigImpl(nil)
 	m.BeginConfig()
 	m.BeginConfig()
 }
@@ -62,12 +67,12 @@ func TestCommitWithoutBegin(t *testing.T) {
 		}
 	}()
 
-	m := NewSharedConfigImpl()
+	m := NewSharedConfigImpl(nil)
 	m.CommitConfig()
 }
 
 func TestRollback(t *testing.T) {
-	m := NewSharedConfigImpl()
+	m := NewSharedConfigImpl(nil)
 	m.pendingConfig = &sharedConfig{}
 	m.RollbackConfig()
 	if m.pendingConfig != nil {
@@ -80,17 +85,17 @@ func TestAnchorPeers(t *testing.T) {
 		&pb.AnchorPeer{Host: "foo", Port: 234, Cert: []byte("foocert")},
 		&pb.AnchorPeer{Host: "bar", Port: 237, Cert: []byte("barcert")},
 	}
-	invalidMessage := makeInvalidConfigItem(AnchorPeersKey)
+	invalidMessage := makeInvalidConfigValue()
 	validMessage := TemplateAnchorPeers(endVal)
-	m := NewSharedConfigImpl()
+	m := NewSharedConfigImpl(nil)
 	m.BeginConfig()
 
-	err := m.ProposeConfig(invalidMessage)
+	err := m.ProposeConfig(AnchorPeersKey, invalidMessage)
 	if err == nil {
 		t.Fatalf("Should have failed on invalid message")
 	}
 
-	err = m.ProposeConfig(validMessage)
+	err = m.ProposeConfig(groupToKeyValue(validMessage))
 	if err != nil {
 		t.Fatalf("Error applying valid config: %s", err)
 	}

@@ -22,10 +22,10 @@ import (
 	"time"
 
 	"github.com/hyperledger/fabric/common/configtx"
-	"github.com/hyperledger/fabric/orderer/common/bootstrap/provisional"
+	genesisconfig "github.com/hyperledger/fabric/common/configtx/tool/localconfig"
+	"github.com/hyperledger/fabric/common/configtx/tool/provisional"
 	ordererledger "github.com/hyperledger/fabric/orderer/ledger"
 	ramledger "github.com/hyperledger/fabric/orderer/ledger/ram"
-	"github.com/hyperledger/fabric/orderer/localconfig"
 	cb "github.com/hyperledger/fabric/protos/common"
 	ab "github.com/hyperledger/fabric/protos/orderer"
 	"github.com/hyperledger/fabric/protos/utils"
@@ -35,11 +35,11 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-var conf *config.TopLevel
+var conf *genesisconfig.TopLevel
 var genesisBlock *cb.Block
 
 func init() {
-	conf = config.Load()
+	conf = genesisconfig.Load()
 	logging.SetLevel(logging.DEBUG, "")
 	genesisBlock = provisional.New(conf).GenesisBlock()
 }
@@ -127,7 +127,7 @@ func TestNoSystemChain(t *testing.T) {
 	lf := ramledger.New(10)
 
 	consenters := make(map[string]Consenter)
-	consenters[conf.Genesis.OrdererType] = &mockConsenter{}
+	consenters[conf.Orderer.OrdererType] = &mockConsenter{}
 
 	NewManagerImpl(lf, consenters, &mockCryptoHelper{})
 }
@@ -137,7 +137,7 @@ func TestManagerImpl(t *testing.T) {
 	lf, rl := NewRAMLedgerAndFactory(10)
 
 	consenters := make(map[string]Consenter)
-	consenters[conf.Genesis.OrdererType] = &mockConsenter{}
+	consenters[conf.Orderer.OrdererType] = &mockConsenter{}
 
 	manager := NewManagerImpl(lf, consenters, &mockCryptoHelper{})
 
@@ -152,8 +152,8 @@ func TestManagerImpl(t *testing.T) {
 		t.Fatalf("Should have gotten chain which was initialized by ramledger")
 	}
 
-	messages := make([]*cb.Envelope, conf.Genesis.BatchSize.MaxMessageCount)
-	for i := 0; i < int(conf.Genesis.BatchSize.MaxMessageCount); i++ {
+	messages := make([]*cb.Envelope, conf.Orderer.BatchSize.MaxMessageCount)
+	for i := 0; i < int(conf.Orderer.BatchSize.MaxMessageCount); i++ {
 		messages[i] = makeNormalTx(provisional.TestChainID, i)
 	}
 
@@ -168,7 +168,7 @@ func TestManagerImpl(t *testing.T) {
 		if status != cb.Status_SUCCESS {
 			t.Fatalf("Could not retrieve block")
 		}
-		for i := 0; i < int(conf.Genesis.BatchSize.MaxMessageCount); i++ {
+		for i := 0; i < int(conf.Orderer.BatchSize.MaxMessageCount); i++ {
 			if !reflect.DeepEqual(utils.ExtractEnvelopeOrPanic(block, i), messages[i]) {
 				t.Errorf("Block contents wrong at index %d", i)
 			}
@@ -183,7 +183,7 @@ func TestSignatureFilter(t *testing.T) {
 	lf, rl := NewRAMLedgerAndFactory(10)
 
 	consenters := make(map[string]Consenter)
-	consenters[conf.Genesis.OrdererType] = &mockConsenter{}
+	consenters[conf.Orderer.OrdererType] = &mockConsenter{}
 
 	manager := NewManagerImpl(lf, consenters, &mockCryptoHelper{})
 
@@ -193,8 +193,8 @@ func TestSignatureFilter(t *testing.T) {
 		t.Fatalf("Should have gotten chain which was initialized by ramledger")
 	}
 
-	messages := make([]*cb.Envelope, conf.Genesis.BatchSize.MaxMessageCount)
-	for i := 0; i < int(conf.Genesis.BatchSize.MaxMessageCount); i++ {
+	messages := make([]*cb.Envelope, conf.Orderer.BatchSize.MaxMessageCount)
+	for i := 0; i < int(conf.Orderer.BatchSize.MaxMessageCount); i++ {
 		messages[i] = makeSignaturelessTx(provisional.TestChainID, i)
 	}
 
@@ -217,23 +217,22 @@ func TestSignatureFilter(t *testing.T) {
 
 // This test brings up the entire system, with the mock consenter, including the broadcasters etc. and creates a new chain
 func TestNewChain(t *testing.T) {
-	conf := config.Load()
+	conf := genesisconfig.Load()
 	lf, rl := NewRAMLedgerAndFactory(10)
 
 	consenters := make(map[string]Consenter)
-	consenters[conf.Genesis.OrdererType] = &mockConsenter{}
+	consenters[conf.Orderer.OrdererType] = &mockConsenter{}
 
 	manager := NewManagerImpl(lf, consenters, &mockCryptoHelper{})
 
 	generator := provisional.New(conf)
-	items := generator.TemplateItems()
-	simpleTemplate := configtx.NewSimpleTemplate(items...)
+	channelTemplate := generator.ChannelTemplate()
 
 	signer, err := msp.NewNoopMsp().GetDefaultSigningIdentity()
 	assert.NoError(t, err)
 
 	newChainID := "TestNewChain"
-	newChainMessage, err := configtx.MakeChainCreationTransaction(provisional.AcceptAllPolicyKey, newChainID, signer, simpleTemplate)
+	newChainMessage, err := configtx.MakeChainCreationTransaction(provisional.AcceptAllPolicyKey, newChainID, signer, channelTemplate)
 	if err != nil {
 		t.Fatalf("Error producing config transaction: %s", err)
 	}
@@ -268,8 +267,8 @@ func TestNewChain(t *testing.T) {
 		t.Fatalf("Should have gotten new chain which was created")
 	}
 
-	messages := make([]*cb.Envelope, conf.Genesis.BatchSize.MaxMessageCount)
-	for i := 0; i < int(conf.Genesis.BatchSize.MaxMessageCount); i++ {
+	messages := make([]*cb.Envelope, conf.Orderer.BatchSize.MaxMessageCount)
+	for i := 0; i < int(conf.Orderer.BatchSize.MaxMessageCount); i++ {
 		messages[i] = makeNormalTx(newChainID, i)
 	}
 
@@ -301,7 +300,7 @@ func TestNewChain(t *testing.T) {
 		if status != cb.Status_SUCCESS {
 			t.Fatalf("Could not retrieve block on new chain")
 		}
-		for i := 0; i < int(conf.Genesis.BatchSize.MaxMessageCount); i++ {
+		for i := 0; i < int(conf.Orderer.BatchSize.MaxMessageCount); i++ {
 			if !reflect.DeepEqual(utils.ExtractEnvelopeOrPanic(block, i), messages[i]) {
 				t.Errorf("Block contents wrong at index %d in new chain", i)
 			}

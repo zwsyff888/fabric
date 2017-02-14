@@ -43,6 +43,7 @@ import (
 	"github.com/hyperledger/fabric/core/ledger/ledgermgmt"
 	"github.com/hyperledger/fabric/msp"
 	mspmgmt "github.com/hyperledger/fabric/msp/mgmt"
+	"github.com/hyperledger/fabric/msp/mgmt/testtools"
 	"github.com/hyperledger/fabric/protos/common"
 	"github.com/spf13/viper"
 	"golang.org/x/net/context"
@@ -283,9 +284,8 @@ func deploy2(ctx context.Context, cccid *ccprovider.CCContext, chaincodeDeployme
 		}
 	}()
 
-	if err = ccprovider.PutChaincodeIntoFS(chaincodeDeploymentSpec); err != nil {
-		return nil, err
-	}
+	//ignore existence errors
+	ccprovider.PutChaincodeIntoFS(chaincodeDeploymentSpec)
 
 	sysCCVers := util.GetSysCCVersion()
 	lcccid := ccprovider.NewCCContext(cccid.ChainID, cis.ChaincodeSpec.ChaincodeId.Name, sysCCVers, uuid, true, nil)
@@ -1152,7 +1152,7 @@ func TestMain(m *testing.M) {
 
 	// setup the MSP manager so that we can sign/verify
 	mspMgrConfigDir := "../../msp/sampleconfig/"
-	mspmgmt.LoadFakeSetupWithLocalMspAndTestChainMsp(mspMgrConfigDir)
+	msptesttools.LoadMSPSetupForTesting(mspMgrConfigDir)
 	signer, err = mspmgmt.GetLocalMSP().GetDefaultSigningIdentity()
 	if err != nil {
 		os.Exit(-1)

@@ -27,7 +27,9 @@ import (
 	"syscall"
 	"time"
 
-	configtxtest "github.com/hyperledger/fabric/common/configtx/test"
+	"github.com/hyperledger/fabric/common/configtx"
+	"github.com/hyperledger/fabric/common/configtx/test"
+	"github.com/hyperledger/fabric/common/genesis"
 	"github.com/hyperledger/fabric/common/util"
 	"github.com/hyperledger/fabric/core"
 	"github.com/hyperledger/fabric/core/chaincode"
@@ -45,7 +47,6 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/grpclog"
 )
 
@@ -72,13 +73,11 @@ var nodeStartCmd = &cobra.Command{
 	},
 }
 
-//!!!!!----IMPORTANT----IMPORTANT---IMPORTANT------!!!!
-//This is a place holder for multichain work. Currently
-//user to create a single chain and initialize it
-func initChainless() {
-	//deploy the chainless system chaincodes
-	scc.DeployChainlessSysCCs()
-	logger.Infof("Deployed chainless system chaincodess")
+//start chaincodes
+func initSysCCs() {
+	//deploy system chaincodes
+	scc.DeploySysCCs("")
+	logger.Infof("Deployed system chaincodess")
 }
 
 func serve(args []string) error {
@@ -115,36 +114,34 @@ func serve(args []string) error {
 		grpclog.Fatalf("Failed to listen: %v", err)
 	}
 
-	ehubLis, ehubGrpcServer, err := createEventHubServer()
+	logger.Infof("Security enabled status: %t", core.SecurityEnabled())
+
+	//Create GRPC server - return if an error occurs
+	secureConfig := comm.SecureServerConfig{
+		UseTLS: viper.GetBool("peer.tls.enabled"),
+	}
+	grpcServer, err := comm.NewGRPCServerFromListener(lis, secureConfig)
+	if err != nil {
+		fmt.Println("Failed to return new GRPC server: ", err)
+		return err
+	}
+
+	//TODO - do we need different SSL material for events ?
+	ehubGrpcServer, err := createEventHubServer(secureConfig)
 	if err != nil {
 		grpclog.Fatalf("Failed to create ehub server: %v", err)
 	}
 
-	logger.Infof("Security enabled status: %t", core.SecurityEnabled())
-
-	var opts []grpc.ServerOption
-	if comm.TLSEnabled() {
-		creds, err := credentials.NewServerTLSFromFile(viper.GetString("peer.tls.cert.file"),
-			viper.GetString("peer.tls.key.file"))
-
-		if err != nil {
-			grpclog.Fatalf("Failed to generate credentials %v", err)
-		}
-		opts = []grpc.ServerOption{grpc.Creds(creds)}
-	}
-
-	grpcServer := grpc.NewServer(opts...)
-
-	registerChaincodeSupport(grpcServer)
+	registerChaincodeSupport(grpcServer.Server())
 
 	logger.Debugf("Running peer")
 
 	// Register the Admin server
-	pb.RegisterAdminServer(grpcServer, core.NewAdminServer())
+	pb.RegisterAdminServer(grpcServer.Server(), core.NewAdminServer())
 
 	// Register the Endorser server
 	serverEndorser := endorser.NewEndorserServer()
-	pb.RegisterEndorserServer(grpcServer, serverEndorser)
+	pb.RegisterEndorserServer(grpcServer.Server(), serverEndorser)
 
 	// Initialize gossip component
 	bootstrap := viper.GetStringSlice("peer.gossip.bootstrap")
@@ -154,17 +151,19 @@ func serve(args []string) error {
 		panic(fmt.Sprintf("Failed serializing self identity: %v", err))
 	}
 
-	service.InitGossipService(serializedIdentity, peerEndpoint.Address, grpcServer, bootstrap...)
+	service.InitGossipService(serializedIdentity, peerEndpoint.Address, grpcServer.Server(), bootstrap...)
 	defer service.GetGossipService().Stop()
 
-	//initialize the env for chainless startup
-	initChainless()
+	//initialize system chaincodes
+	initSysCCs()
 
 	// Begin startup of default chain
 	if peerDefaultChain {
 		chainID := util.GetTestChainID()
 
-		block, err := configtxtest.MakeGenesisBlock(chainID)
+		// We create a genesis block for the test
+		// chain with its MSP so that we can transact
+		block, err := genesis.NewFactoryImpl(configtx.NewCompositeTemplate(test.MSPTemplate())).Block(chainID)
 		if nil != err {
 			panic(fmt.Sprintf("Unable to create genesis block for [%s] due to [%s]", chainID, err))
 		}
@@ -203,7 +202,7 @@ func serve(args []string) error {
 
 	go func() {
 		var grpcErr error
-		if grpcErr = grpcServer.Serve(lis); grpcErr != nil {
+		if grpcErr = grpcServer.Start(); grpcErr != nil {
 			grpcErr = fmt.Errorf("grpc server exited with error: %s", grpcErr)
 		} else {
 			logger.Info("grpc server exited")
@@ -216,8 +215,8 @@ func serve(args []string) error {
 	}
 
 	// Start the event hub server
-	if ehubGrpcServer != nil && ehubLis != nil {
-		go ehubGrpcServer.Serve(ehubLis)
+	if ehubGrpcServer != nil {
+		go ehubGrpcServer.Start()
 	}
 
 	// Start profiling http endpoint if enabled
@@ -276,35 +275,25 @@ func registerChaincodeSupport(grpcServer *grpc.Server) {
 	pb.RegisterChaincodeSupportServer(grpcServer, ccSrv)
 }
 
-func createEventHubServer() (net.Listener, *grpc.Server, error) {
+func createEventHubServer(secureConfig comm.SecureServerConfig) (comm.GRPCServer, error) {
 	var lis net.Listener
-	var grpcServer *grpc.Server
 	var err error
 	lis, err = net.Listen("tcp", viper.GetString("peer.events.address"))
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to listen: %v", err)
+		return nil, fmt.Errorf("failed to listen: %v", err)
 	}
 
-	//TODO - do we need different SSL material for events ?
-	var opts []grpc.ServerOption
-	if comm.TLSEnabled() {
-		creds, err := credentials.NewServerTLSFromFile(
-			viper.GetString("peer.tls.cert.file"),
-			viper.GetString("peer.tls.key.file"))
-
-		if err != nil {
-			return nil, nil, fmt.Errorf("Failed to generate credentials %v", err)
-		}
-		opts = []grpc.ServerOption{grpc.Creds(creds)}
+	grpcServer, err := comm.NewGRPCServerFromListener(lis, secureConfig)
+	if err != nil {
+		fmt.Println("Failed to return new GRPC server: ", err)
+		return nil, err
 	}
-
-	grpcServer = grpc.NewServer(opts...)
 	ehServer := producer.NewEventsServer(
 		uint(viper.GetInt("peer.events.buffersize")),
 		viper.GetInt("peer.events.timeout"))
 
-	pb.RegisterEventsServer(grpcServer, ehServer)
-	return lis, grpcServer, err
+	pb.RegisterEventsServer(grpcServer.Server(), ehServer)
+	return grpcServer, nil
 }
 
 func writePid(fileName string, pid int) error {

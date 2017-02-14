@@ -34,6 +34,7 @@ import (
 	syscc "github.com/hyperledger/fabric/core/scc"
 	"github.com/hyperledger/fabric/msp"
 	mspmgmt "github.com/hyperledger/fabric/msp/mgmt"
+	"github.com/hyperledger/fabric/msp/mgmt/testtools"
 	"github.com/hyperledger/fabric/protos/common"
 	pb "github.com/hyperledger/fabric/protos/peer"
 	pbutils "github.com/hyperledger/fabric/protos/utils"
@@ -264,6 +265,8 @@ func TestDeploy(t *testing.T) {
 	chainID := util.GetTestChainID()
 	spec := &pb.ChaincodeSpec{Type: 1, ChaincodeId: &pb.ChaincodeID{Name: "ex01", Path: "github.com/hyperledger/fabric/examples/chaincode/go/chaincode_example01", Version: "0"}, Input: &pb.ChaincodeInput{Args: [][]byte{[]byte("init"), []byte("a"), []byte("100"), []byte("b"), []byte("200")}}}
 
+	defer os.RemoveAll("/tmp/hyperledger/production/chaincodes/ex01.0")
+
 	cccid := ccprovider.NewCCContext(chainID, "ex01", "0", "", false, nil)
 
 	_, _, err := deploy(endorserServer, chainID, spec, nil)
@@ -283,6 +286,8 @@ func TestRedeploy(t *testing.T) {
 	//invalid arguments
 	spec := &pb.ChaincodeSpec{Type: 1, ChaincodeId: &pb.ChaincodeID{Name: "ex02", Path: "github.com/hyperledger/fabric/examples/chaincode/go/chaincode_example02", Version: "0"}, Input: &pb.ChaincodeInput{Args: [][]byte{[]byte("init"), []byte("a"), []byte("100"), []byte("b"), []byte("200")}}}
 
+	defer os.RemoveAll("/tmp/hyperledger/production/chaincodes/ex02.0")
+
 	cccid := ccprovider.NewCCContext(chainID, "ex02", "0", "", false, nil)
 
 	_, _, err := deploy(endorserServer, chainID, spec, nil)
@@ -292,6 +297,8 @@ func TestRedeploy(t *testing.T) {
 		chaincode.GetChain().Stop(context.Background(), cccid, &pb.ChaincodeDeploymentSpec{ChaincodeSpec: spec})
 		return
 	}
+
+	os.RemoveAll("/tmp/hyperledger/production/chaincodes/ex02.0")
 
 	//second time should not fail as we are just simulating
 	_, _, err = deploy(endorserServer, chainID, spec, nil)
@@ -311,6 +318,8 @@ func TestDeployAndInvoke(t *testing.T) {
 
 	url := "github.com/hyperledger/fabric/examples/chaincode/go/chaincode_example01"
 	chaincodeID := &pb.ChaincodeID{Path: url, Name: "ex01", Version: "0"}
+
+	defer os.RemoveAll("/tmp/hyperledger/production/chaincodes/ex01.0")
 
 	args := []string{"10"}
 
@@ -363,6 +372,9 @@ func TestDeployAndUpgrade(t *testing.T) {
 	url2 := "github.com/hyperledger/fabric/examples/chaincode/go/chaincode_example02"
 	chaincodeID1 := &pb.ChaincodeID{Path: url1, Name: "upgradeex01", Version: "0"}
 	chaincodeID2 := &pb.ChaincodeID{Path: url2, Name: "upgradeex01", Version: "1"}
+
+	defer os.RemoveAll("/tmp/hyperledger/production/chaincodes/upgradeex01.0")
+	defer os.RemoveAll("/tmp/hyperledger/production/chaincodes/upgradeex01.1")
 
 	f := "init"
 	argsDeploy := util.ToChaincodeArgs(f, "a", "100", "b", "200")
@@ -426,7 +438,7 @@ func TestMain(m *testing.M) {
 
 	// setup the MSP manager so that we can sign/verify
 	mspMgrConfigDir := "../../msp/sampleconfig/"
-	err = mspmgmt.LoadFakeSetupWithLocalMspAndTestChainMsp(mspMgrConfigDir)
+	err = msptesttools.LoadMSPSetupForTesting(mspMgrConfigDir)
 	if err != nil {
 		fmt.Printf("Could not initialize msp/signer, err %s", err)
 		os.Exit(-1)

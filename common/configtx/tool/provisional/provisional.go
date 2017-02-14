@@ -23,9 +23,9 @@ import (
 	"github.com/hyperledger/fabric/common/configtx"
 	configtxchannel "github.com/hyperledger/fabric/common/configtx/handlers/channel"
 	configtxorderer "github.com/hyperledger/fabric/common/configtx/handlers/orderer"
+	genesisconfig "github.com/hyperledger/fabric/common/configtx/tool/localconfig"
 	"github.com/hyperledger/fabric/common/genesis"
 	"github.com/hyperledger/fabric/orderer/common/bootstrap"
-	"github.com/hyperledger/fabric/orderer/localconfig"
 	cb "github.com/hyperledger/fabric/protos/common"
 	ab "github.com/hyperledger/fabric/protos/orderer"
 )
@@ -34,8 +34,8 @@ import (
 type Generator interface {
 	bootstrap.Helper
 
-	// TemplateItems returns a set of config items which can be used to initialize a template
-	TemplateItems() []*cb.ConfigItem
+	// ChannelTemplate returns a template which can be used to help initialize a channel
+	ChannelTemplate() configtx.Template
 }
 
 const (
@@ -60,27 +60,27 @@ const (
 var DefaultChainCreationPolicyNames = []string{AcceptAllPolicyKey}
 
 type bootstrapper struct {
-	minimalItems     []*cb.ConfigItem
-	systemChainItems []*cb.ConfigItem
+	minimalGroups     []*cb.ConfigGroup
+	systemChainGroups []*cb.ConfigGroup
 }
 
 // New returns a new provisional bootstrap helper.
-func New(conf *config.TopLevel) Generator {
+func New(conf *genesisconfig.TopLevel) Generator {
 	bs := &bootstrapper{
-		minimalItems: []*cb.ConfigItem{
+		minimalGroups: []*cb.ConfigGroup{
 			// Chain Config Types
 			configtxchannel.DefaultHashingAlgorithm(),
 			configtxchannel.DefaultBlockDataHashingStructure(),
-			configtxchannel.TemplateOrdererAddresses([]string{fmt.Sprintf("%s:%d", conf.General.ListenAddress, conf.General.ListenPort)}),
+			configtxchannel.TemplateOrdererAddresses(conf.Orderer.Addresses),
 
 			// Orderer Config Types
-			configtxorderer.TemplateConsensusType(conf.Genesis.OrdererType),
+			configtxorderer.TemplateConsensusType(conf.Orderer.OrdererType),
 			configtxorderer.TemplateBatchSize(&ab.BatchSize{
-				MaxMessageCount:   conf.Genesis.BatchSize.MaxMessageCount,
-				AbsoluteMaxBytes:  conf.Genesis.BatchSize.AbsoluteMaxBytes,
-				PreferredMaxBytes: conf.Genesis.BatchSize.PreferredMaxBytes,
+				MaxMessageCount:   conf.Orderer.BatchSize.MaxMessageCount,
+				AbsoluteMaxBytes:  conf.Orderer.BatchSize.AbsoluteMaxBytes,
+				PreferredMaxBytes: conf.Orderer.BatchSize.PreferredMaxBytes,
 			}),
-			configtxorderer.TemplateBatchTimeout(conf.Genesis.BatchTimeout.String()),
+			configtxorderer.TemplateBatchTimeout(conf.Orderer.BatchTimeout.String()),
 			configtxorderer.TemplateIngressPolicyNames([]string{AcceptAllPolicyKey}),
 			configtxorderer.TemplateEgressPolicyNames([]string{AcceptAllPolicyKey}),
 
@@ -89,31 +89,31 @@ func New(conf *config.TopLevel) Generator {
 			cauthdsl.TemplatePolicy(AcceptAllPolicyKey, cauthdsl.AcceptAllPolicy),
 		},
 
-		systemChainItems: []*cb.ConfigItem{
+		systemChainGroups: []*cb.ConfigGroup{
 			configtxorderer.TemplateChainCreationPolicyNames(DefaultChainCreationPolicyNames),
 		},
 	}
 
-	switch conf.Genesis.OrdererType {
+	switch conf.Orderer.OrdererType {
 	case ConsensusTypeSolo, ConsensusTypeSbft:
 	case ConsensusTypeKafka:
-		bs.minimalItems = append(bs.minimalItems, configtxorderer.TemplateKafkaBrokers(conf.Kafka.Brokers))
+		bs.minimalGroups = append(bs.minimalGroups, configtxorderer.TemplateKafkaBrokers(conf.Orderer.Kafka.Brokers))
 	default:
-		panic(fmt.Errorf("Wrong consenter type value given: %s", conf.Genesis.OrdererType))
+		panic(fmt.Errorf("Wrong consenter type value given: %s", conf.Orderer.OrdererType))
 	}
 
 	return bs
 }
 
-func (bs *bootstrapper) TemplateItems() []*cb.ConfigItem {
-	return bs.minimalItems
+func (bs *bootstrapper) ChannelTemplate() configtx.Template {
+	return configtx.NewSimpleTemplateNext(bs.minimalGroups...)
 }
 
 func (bs *bootstrapper) GenesisBlock() *cb.Block {
 	block, err := genesis.NewFactoryImpl(
 		configtx.NewCompositeTemplate(
-			configtx.NewSimpleTemplate(bs.minimalItems...),
-			configtx.NewSimpleTemplate(bs.systemChainItems...),
+			configtx.NewSimpleTemplateNext(bs.systemChainGroups...),
+			bs.ChannelTemplate(),
 		),
 	).Block(TestChainID)
 

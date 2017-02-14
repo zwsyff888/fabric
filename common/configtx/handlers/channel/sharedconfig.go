@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"math"
 
+	"github.com/hyperledger/fabric/common/configtx/api"
 	"github.com/hyperledger/fabric/common/configtx/handlers/application"
 	"github.com/hyperledger/fabric/common/configtx/handlers/orderer"
 	"github.com/hyperledger/fabric/common/util"
@@ -29,18 +30,10 @@ import (
 	"github.com/op/go-logging"
 )
 
-const (
-	// ApplicationGroupKey is the group name for the application config
-	ApplicationGroupKey = "Application"
-
-	// OrdererGroupKey is the group name for the orderer config
-	OrdererGroupKey = "Orderer"
-)
-
 var Schema = &cb.ConfigGroupSchema{
 	Groups: map[string]*cb.ConfigGroupSchema{
-		ApplicationGroupKey: application.Schema,
-		OrdererGroupKey:     orderer.Schema,
+		application.GroupKey: application.Schema,
+		orderer.GroupKey:     orderer.Schema,
 	},
 	Values: map[string]*cb.ConfigValueSchema{
 		HashingAlgorithmKey:          nil,
@@ -83,12 +76,17 @@ type chainConfig struct {
 type SharedConfigImpl struct {
 	pendingConfig *chainConfig
 	config        *chainConfig
+
+	ordererConfig     *orderer.ManagerImpl
+	applicationConfig *application.SharedConfigImpl
 }
 
 // NewSharedConfigImpl creates a new SharedConfigImpl with the given CryptoHelper
-func NewSharedConfigImpl() *SharedConfigImpl {
+func NewSharedConfigImpl(ordererConfig *orderer.ManagerImpl, applicationConfig *application.SharedConfigImpl) *SharedConfigImpl {
 	return &SharedConfigImpl{
-		config: &chainConfig{},
+		config:            &chainConfig{},
+		ordererConfig:     ordererConfig,
+		applicationConfig: applicationConfig,
 	}
 }
 
@@ -130,15 +128,11 @@ func (pm *SharedConfigImpl) CommitConfig() {
 }
 
 // ProposeConfig is used to add new config to the config proposal
-func (pm *SharedConfigImpl) ProposeConfig(configItem *cb.ConfigItem) error {
-	if configItem.Type != cb.ConfigItem_CHAIN {
-		return fmt.Errorf("Expected type of ConfigItem_Chain, got %v", configItem.Type)
-	}
-
-	switch configItem.Key {
+func (pm *SharedConfigImpl) ProposeConfig(key string, configValue *cb.ConfigValue) error {
+	switch key {
 	case HashingAlgorithmKey:
 		hashingAlgorithm := &cb.HashingAlgorithm{}
-		if err := proto.Unmarshal(configItem.Value, hashingAlgorithm); err != nil {
+		if err := proto.Unmarshal(configValue.Value, hashingAlgorithm); err != nil {
 			return fmt.Errorf("Unmarshaling error for HashingAlgorithm: %s", err)
 		}
 		switch hashingAlgorithm.Name {
@@ -149,7 +143,7 @@ func (pm *SharedConfigImpl) ProposeConfig(configItem *cb.ConfigItem) error {
 		}
 	case BlockDataHashingStructureKey:
 		blockDataHashingStructure := &cb.BlockDataHashingStructure{}
-		if err := proto.Unmarshal(configItem.Value, blockDataHashingStructure); err != nil {
+		if err := proto.Unmarshal(configValue.Value, blockDataHashingStructure); err != nil {
 			return fmt.Errorf("Unmarshaling error for BlockDataHashingStructure: %s", err)
 		}
 
@@ -160,12 +154,34 @@ func (pm *SharedConfigImpl) ProposeConfig(configItem *cb.ConfigItem) error {
 		pm.pendingConfig.blockDataHashingStructureWidth = blockDataHashingStructure.Width
 	case OrdererAddressesKey:
 		ordererAddresses := &cb.OrdererAddresses{}
-		if err := proto.Unmarshal(configItem.Value, ordererAddresses); err != nil {
+		if err := proto.Unmarshal(configValue.Value, ordererAddresses); err != nil {
 			return fmt.Errorf("Unmarshaling error for HashingAlgorithm: %s", err)
 		}
 		pm.pendingConfig.ordererAddresses = ordererAddresses.Addresses
 	default:
-		logger.Warningf("Uknown Chain config item with key %s", configItem.Key)
+		logger.Warningf("Uknown Chain config item with key %s", key)
 	}
 	return nil
+}
+
+// Handler returns the associated api.Handler for the given path
+func (pm *SharedConfigImpl) Handler(path []string) (api.Handler, error) {
+	if len(path) == 0 {
+		return pm, nil
+	}
+
+	var initializer api.SubInitializer
+
+	switch path[0] {
+	case application.GroupKey:
+		initializer = pm.applicationConfig
+	case orderer.GroupKey:
+		initializer = pm.ordererConfig
+	default:
+		return nil, fmt.Errorf("Disallowed channel group: %s", path[0])
+	}
+
+	return initializer.Handler(path[1:])
+
+	return nil, fmt.Errorf("Unallowed group")
 }

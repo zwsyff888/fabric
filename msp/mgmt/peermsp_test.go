@@ -20,8 +20,6 @@ import (
 	"io/ioutil"
 	"os"
 	"testing"
-
-	"github.com/hyperledger/fabric/common/util"
 )
 
 // getTestMSPConfigPath returns the path to sampleconfig for unit tests
@@ -35,7 +33,8 @@ func getTestMSPConfigPath() string {
 
 func TestLocalMSP(t *testing.T) {
 	testMSPConfigPath := getTestMSPConfigPath()
-	err := LoadLocalMsp(testMSPConfigPath)
+	err := LoadLocalMsp(testMSPConfigPath, "DEFAULT")
+
 	if err != nil {
 		t.Fatalf("LoadLocalMsp failed, err %s", err)
 	}
@@ -43,28 +42,5 @@ func TestLocalMSP(t *testing.T) {
 	_, err = GetLocalMSP().GetDefaultSigningIdentity()
 	if err != nil {
 		t.Fatalf("GetDefaultSigningIdentity failed, err %s", err)
-	}
-}
-
-// TODO: as soon as proper per-chain MSP support is developed, this test will no longer be required
-func TestFakeSetup(t *testing.T) {
-	testMSPConfigPath := getTestMSPConfigPath()
-	err := LoadFakeSetupWithLocalMspAndTestChainMsp(testMSPConfigPath)
-	if err != nil {
-		t.Fatalf("LoadLocalMsp failed, err %s", err)
-	}
-
-	_, err = GetLocalMSP().GetDefaultSigningIdentity()
-	if err != nil {
-		t.Fatalf("GetDefaultSigningIdentity failed, err %s", err)
-	}
-
-	msps, err := GetManagerForChain(util.GetTestChainID()).GetMSPs()
-	if err != nil {
-		t.Fatalf("EnlistedMSPs failed, err %s", err)
-	}
-
-	if msps == nil || len(msps) == 0 {
-		t.Fatalf("There are no MSPS in the manager for chain %s", util.GetTestChainID())
 	}
 }

@@ -18,8 +18,10 @@ package msp
 
 import (
 	"fmt"
+	"reflect"
 
 	"github.com/golang/protobuf/proto"
+	"github.com/hyperledger/fabric/common/configtx/api"
 	"github.com/hyperledger/fabric/msp"
 	"github.com/hyperledger/fabric/protos/common"
 	mspprotos "github.com/hyperledger/fabric/protos/msp"
@@ -58,11 +60,19 @@ func (bh *MSPConfigHandler) CommitConfig() {
 }
 
 // ProposeConfig called when config is added to a proposal
-func (bh *MSPConfigHandler) ProposeConfig(configItem *common.ConfigItem) error {
+func (bh *MSPConfigHandler) ProposeConfig(key string, configValue *common.ConfigValue) error {
 	mspconfig := &mspprotos.MSPConfig{}
-	err := proto.Unmarshal(configItem.Value, mspconfig)
+	err := proto.Unmarshal(configValue.Value, mspconfig)
 	if err != nil {
 		return fmt.Errorf("Error unmarshalling msp config item, err %s", err)
+	}
+
+	// TODO handle deduplication more gracefully
+	for _, oMsp := range bh.config {
+		if reflect.DeepEqual(oMsp, mspconfig) {
+			// The MSP is already in the list
+			return nil
+		}
 	}
 
 	bh.config = append(bh.config, []*mspprotos.MSPConfig{mspconfig}...)
@@ -72,4 +82,13 @@ func (bh *MSPConfigHandler) ProposeConfig(configItem *common.ConfigItem) error {
 	// it and return whatever error setup gives me
 	bh.proposedMgr = msp.NewMSPManager()
 	return bh.proposedMgr.Setup(bh.config)
+}
+
+// Handler returns the associated api.Handler for the given path
+func (bh *MSPConfigHandler) Handler(path []string) (api.Handler, error) {
+	if len(path) > 0 {
+		return nil, fmt.Errorf("MSP handler does not support nested groups")
+	}
+
+	return bh, nil
 }
