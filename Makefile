@@ -51,7 +51,7 @@ ARCH=$(shell uname -m)
 CHAINTOOL_RELEASE=v0.10.2
 BASEIMAGE_RELEASE=$(shell cat ./.baseimage-release)
 
-CHAINTOOL_URL ?= http://192.168.100.119:9000/software/chaintool_v0.10.1
+CHAINTOOL_URL ?= http://192.168.100.119:9000/software/chaintool_v0.10.2
 
 export GO_LDFLAGS
 
