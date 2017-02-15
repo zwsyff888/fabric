@@ -20,6 +20,7 @@ import (
 	"fmt"
 
 	"github.com/hyperledger/fabric/common/configtx"
+	configtxorderer "github.com/hyperledger/fabric/common/configtx/handlers/orderer"
 	"github.com/hyperledger/fabric/orderer/common/blockcutter"
 	cb "github.com/hyperledger/fabric/protos/common"
 	"github.com/hyperledger/fabric/protos/utils"
@@ -81,19 +82,20 @@ func (mlw *mockLedgerWriter) Append(blockContents []*cb.Envelope, metadata [][]b
 }
 
 func makeConfigTx(chainID string, i int) *cb.Envelope {
-	configTemplate := configtx.NewSimpleTemplate(&cb.ConfigItem{
-		Type:  cb.ConfigItem_ORDERER,
-		Key:   fmt.Sprintf("%d", i),
+	group := cb.NewConfigGroup()
+	group.Groups[configtxorderer.GroupKey] = cb.NewConfigGroup()
+	group.Groups[configtxorderer.GroupKey].Values[fmt.Sprintf("%d", i)] = &cb.ConfigValue{
 		Value: []byte(fmt.Sprintf("%d", i)),
-	})
+	}
+	configTemplate := configtx.NewSimpleTemplate(group)
 	configEnv, err := configTemplate.Envelope(chainID)
 	if err != nil {
 		panic(err)
 	}
-	return makeConfigTxFromConfigEnvelope(chainID, configEnv)
+	return makeConfigTxFromConfigUpdateEnvelope(chainID, configEnv)
 }
 
-func makeConfigTxFromConfigEnvelope(chainID string, configEnv *cb.ConfigEnvelope) *cb.Envelope {
+func makeConfigTxFromConfigUpdateEnvelope(chainID string, configUpdateEnv *cb.ConfigUpdateEnvelope) *cb.Envelope {
 	payload := &cb.Payload{
 		Header: &cb.Header{
 			ChannelHeader: &cb.ChannelHeader{
@@ -102,7 +104,9 @@ func makeConfigTxFromConfigEnvelope(chainID string, configEnv *cb.ConfigEnvelope
 			},
 			SignatureHeader: &cb.SignatureHeader{},
 		},
-		Data: utils.MarshalOrPanic(configEnv),
+		Data: utils.MarshalOrPanic(&cb.ConfigEnvelope{
+			LastUpdate: configUpdateEnv,
+		}),
 	}
 	return &cb.Envelope{
 		Payload: utils.MarshalOrPanic(payload),

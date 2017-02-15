@@ -19,6 +19,7 @@ package multichain
 import (
 	"github.com/hyperledger/fabric/common/configtx"
 	configtxapi "github.com/hyperledger/fabric/common/configtx/api"
+	configtxorderer "github.com/hyperledger/fabric/common/configtx/handlers/orderer"
 	"github.com/hyperledger/fabric/common/policies"
 	"github.com/hyperledger/fabric/orderer/common/filter"
 	cb "github.com/hyperledger/fabric/protos/common"
@@ -147,23 +148,28 @@ func (sc *systemChain) proposeChain(configTx *cb.Envelope) cb.Status {
 }
 
 func (sc *systemChain) authorize(configEnvelope *cb.ConfigEnvelope) cb.Status {
-	configNext := &cb.ConfigNext{}
-	err := proto.Unmarshal(configEnvelope.Config, configNext)
+	// XXX as a temporary hack to get the protos in, we assume the write set contains the whole config
+
+	if configEnvelope.LastUpdate == nil {
+		logger.Debugf("Must include a config update")
+		return cb.Status_BAD_REQUEST
+	}
+
+	configNext := &cb.ConfigUpdate{}
+	err := proto.Unmarshal(configEnvelope.LastUpdate.ConfigUpdate, configNext)
 	if err != nil {
 		logger.Debugf("Failing to validate chain creation because of unmarshaling error: %s", err)
 		return cb.Status_BAD_REQUEST
 	}
-	config := configtx.ConfigNextToConfig(configNext)
 
-	var creationConfigItem *cb.ConfigItem
-	for _, item := range config.Items {
-		if item.Type == cb.ConfigItem_ORDERER && item.Key == configtx.CreationPolicyKey {
-			creationConfigItem = item
-			break
-		}
+	ordererGroup, ok := configNext.WriteSet.Groups[configtxorderer.GroupKey]
+	if !ok {
+		logger.Debugf("Rejecting channel creation because it is missing orderer group")
+		return cb.Status_BAD_REQUEST
 	}
 
-	if creationConfigItem == nil {
+	creationConfigItem, ok := ordererGroup.Values[configtx.CreationPolicyKey]
+	if !ok {
 		logger.Debugf("Failing to validate chain creation because no creation policy included")
 		return cb.Status_BAD_REQUEST
 	}
@@ -175,7 +181,7 @@ func (sc *systemChain) authorize(configEnvelope *cb.ConfigEnvelope) cb.Status {
 		return cb.Status_BAD_REQUEST
 	}
 
-	ok := false
+	ok = false
 	for _, chainCreatorPolicy := range sc.support.SharedConfig().ChainCreationPolicyNames() {
 		if chainCreatorPolicy == creationPolicy.Policy {
 			ok = true
@@ -194,7 +200,7 @@ func (sc *systemChain) authorize(configEnvelope *cb.ConfigEnvelope) cb.Status {
 		return cb.Status_INTERNAL_SERVER_ERROR
 	}
 
-	signedData, err := configEnvelope.AsSignedData()
+	signedData, err := configEnvelope.LastUpdate.AsSignedData()
 	if err != nil {
 		logger.Debugf("Failed to validate chain creation because config envelope could not be converted to signed data: %s", err)
 		return cb.Status_BAD_REQUEST

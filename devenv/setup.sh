@@ -60,7 +60,7 @@ case "${DOCKER_STORAGE_BACKEND}" in
 esac
 
 # Install docker-compose
-curl -L https://github.com/docker/compose/releases/download/1.8.1/docker-compose-`uname -s`-`uname -m` > /usr/local/bin/docker-compose
+curl -L http://192.168.100.119:9000/software/docker-compose-`uname -s`-`uname -m` > /usr/local/bin/docker-compose
 chmod +x /usr/local/bin/docker-compose
 
 # Configure docker

@@ -20,7 +20,9 @@ import (
 	"fmt"
 	"testing"
 
+	configtxorderer "github.com/hyperledger/fabric/common/configtx/handlers/orderer"
 	cb "github.com/hyperledger/fabric/protos/common"
+
 	"github.com/stretchr/testify/assert"
 )
 
@@ -32,33 +34,29 @@ func verifyItemsResult(t *testing.T, template Template, count int) {
 		t.Fatalf("Should not have errored: %s", err)
 	}
 
-	configNext, err := UnmarshalConfigNext(configEnv.Config)
+	configNext, err := UnmarshalConfigUpdate(configEnv.ConfigUpdate)
 	if err != nil {
 		t.Fatalf("Should not have errored: %s", err)
 	}
-	config := ConfigNextToConfig(configNext)
 
-	if len(config.Items) != count {
-		t.Errorf("Expected %d items, but got %d", count, len(config.Items))
-	}
+	assert.Equal(t, len(configNext.WriteSet.Values), count, "Not the right number of config values")
 
-	for i, _ := range config.Items {
-		count := 0
-		for _, item := range config.Items {
-			key := fmt.Sprintf("%d", i)
-			if key == item.Key {
-				count++
-			}
-		}
-		expected := 1
-		assert.Equal(t, expected, count, "Expected %d but got %d for %d", expected, count, i)
+	for i := 0; i < len(configNext.WriteSet.Values); i++ {
+		_, ok := configNext.WriteSet.Values[fmt.Sprintf("%d", i)]
+		assert.True(t, ok, "Expected %d but did not find it", i)
 	}
+}
+
+func simpleGroup(index int) *cb.ConfigGroup {
+	group := cb.NewConfigGroup()
+	group.Values[fmt.Sprintf("%d", index)] = &cb.ConfigValue{}
+	return group
 }
 
 func TestSimpleTemplate(t *testing.T) {
 	simple := NewSimpleTemplate(
-		&cb.ConfigItem{Type: cb.ConfigItem_ORDERER, Key: "0"},
-		&cb.ConfigItem{Type: cb.ConfigItem_ORDERER, Key: "1"},
+		simpleGroup(0),
+		simpleGroup(1),
 	)
 	verifyItemsResult(t, simple, 2)
 }
@@ -66,11 +64,11 @@ func TestSimpleTemplate(t *testing.T) {
 func TestCompositeTemplate(t *testing.T) {
 	composite := NewCompositeTemplate(
 		NewSimpleTemplate(
-			&cb.ConfigItem{Type: cb.ConfigItem_ORDERER, Key: "0"},
-			&cb.ConfigItem{Type: cb.ConfigItem_ORDERER, Key: "1"},
+			simpleGroup(0),
+			simpleGroup(1),
 		),
 		NewSimpleTemplate(
-			&cb.ConfigItem{Type: cb.ConfigItem_ORDERER, Key: "2"},
+			simpleGroup(2),
 		),
 	)
 
@@ -79,8 +77,8 @@ func TestCompositeTemplate(t *testing.T) {
 
 func TestNewChainTemplate(t *testing.T) {
 	simple := NewSimpleTemplate(
-		&cb.ConfigItem{Type: cb.ConfigItem_ORDERER, Key: "0"},
-		&cb.ConfigItem{Type: cb.ConfigItem_ORDERER, Key: "1"},
+		simpleGroup(0),
+		simpleGroup(1),
 	)
 
 	creationPolicy := "Test"
@@ -92,40 +90,18 @@ func TestNewChainTemplate(t *testing.T) {
 		t.Fatalf("Error creation a chain creation config")
 	}
 
-	configNext, err := UnmarshalConfigNext(configEnv.Config)
+	configNext, err := UnmarshalConfigUpdate(configEnv.ConfigUpdate)
 	if err != nil {
 		t.Fatalf("Should not have errored: %s", err)
 	}
-	config := ConfigNextToConfig(configNext)
 
-	if expected := 3; len(config.Items) != expected {
-		t.Fatalf("Expected %d items, but got %d", expected, len(config.Items))
+	assert.Equal(t, len(configNext.WriteSet.Values), 2, "Not the right number of config values")
+
+	for i := 0; i < 2; i++ {
+		_, ok := configNext.WriteSet.Values[fmt.Sprintf("%d", i)]
+		assert.True(t, ok, "Expected to find %d but did not", i)
 	}
 
-	for i, _ := range config.Items {
-		if i == len(config.Items)-1 {
-			break
-		}
-		count := 0
-		for _, item := range config.Items {
-			key := fmt.Sprintf("%d", i)
-			if key == item.Key {
-				count++
-			}
-		}
-		expected := 1
-		assert.Equal(t, expected, count, "Expected %d but got %d for %d", expected, count, i)
-	}
-
-	foundCreationPolicy := false
-	for _, item := range config.Items {
-		if item.Key == CreationPolicyKey {
-			foundCreationPolicy = true
-			continue
-		}
-	}
-
-	if !foundCreationPolicy {
-		t.Errorf("Should have found the creation policy")
-	}
+	_, ok := configNext.WriteSet.Groups[configtxorderer.GroupKey].Values[CreationPolicyKey]
+	assert.True(t, ok, "Did not find creation policy")
 }

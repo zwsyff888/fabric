@@ -27,16 +27,15 @@ It has these top-level messages:
 	BlockData
 	BlockMetadata
 	ConfigEnvelope
-	ConfigTemplate
 	ConfigGroupSchema
 	ConfigValueSchema
 	ConfigPolicySchema
 	Config
-	ConfigNext
+	ConfigUpdateEnvelope
+	ConfigUpdate
 	ConfigGroup
 	ConfigValue
 	ConfigPolicy
-	ConfigItem
 	ConfigSignature
 	HashingAlgorithm
 	BlockDataHashingStructure
