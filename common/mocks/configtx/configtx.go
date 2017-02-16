@@ -66,12 +66,27 @@ func (r *Resources) MSPManager() msp.MSPManager {
 	return r.MSPManagerVal
 }
 
+type Transactional struct{}
+
+// BeginConfig calls through to the HandlerVal
+func (t *Transactional) BeginConfig() {}
+
+// CommitConfig calls through to the HandlerVal
+func (t *Transactional) CommitConfig() {}
+
+// RollbackConfig calls through to the HandlerVal
+func (t *Transactional) RollbackConfig() {}
+
 // Initializer mocks the configtxapi.Initializer interface
 type Initializer struct {
+	Transactional
 	Resources
 
 	// HandlersVal is returned as the result of Handlers()
 	HandlerVal configtxapi.Handler
+
+	// PolicyHandlerVal is reutrned at the result of PolicyHandler()
+	PolicyHandlerVal *PolicyHandler
 }
 
 // Returns the HandlersVal
@@ -79,18 +94,27 @@ func (i *Initializer) Handler(path []string) (configtxapi.Handler, error) {
 	return i.HandlerVal, nil
 }
 
-func (i *Initializer) PolicyProposer() configtxapi.Handler {
-	panic("Unimplemented")
+// Returns the PolicyHandlerVal
+func (i *Initializer) PolicyHandler() configtxapi.PolicyHandler {
+	return i.PolicyHandlerVal
 }
 
-// BeginConfig calls through to the HandlerVal
-func (i *Initializer) BeginConfig() {}
+// PolicyHandler mocks the configtxapi.PolicyHandler interface
+type PolicyHandler struct {
+	Transactional
+	LastKey               string
+	LastPath              []string
+	LastValue             *cb.ConfigPolicy
+	ErrorForProposePolicy error
+}
 
-// CommitConfig calls through to the HandlerVal
-func (i *Initializer) CommitConfig() {}
-
-// RollbackConfig calls through to the HandlerVal
-func (i *Initializer) RollbackConfig() {}
+// ProposeConfig sets LastKey to key, LastPath to path, and LastPolicy to configPolicy, returning ErrorForProposedConfig
+func (ph *PolicyHandler) ProposePolicy(key string, path []string, configPolicy *cb.ConfigPolicy) error {
+	ph.LastKey = key
+	ph.LastValue = configPolicy
+	ph.LastPath = path
+	return ph.ErrorForProposePolicy
+}
 
 // Handler mocks the configtxapi.Handler interface
 type Handler struct {
@@ -115,6 +139,20 @@ type Manager struct {
 
 	// SequenceVal is returned as the result of Sequence()
 	SequenceVal uint64
+
+	// ApplyVal is returned by Apply
+	ApplyVal error
+
+	// AppliedConfigUpdateEnvelope is set by Apply
+	AppliedConfigUpdateEnvelope *cb.Envelope
+
+	// ValidateVal is returned by Validate
+	ValidateVal error
+}
+
+// ConfigEnvelope is currently unimplemented
+func (cm *Manager) ConfigEnvelope() *cb.ConfigEnvelope {
+	panic("Unimplemented")
 }
 
 // ConsensusType returns the ConsensusTypeVal
@@ -127,13 +165,13 @@ func (cm *Manager) Sequence() uint64 {
 	return cm.SequenceVal
 }
 
-// Apply panics
-func (cm *Manager) Apply(configtx *cb.ConfigEnvelope) error {
-	panic("Unimplemented")
+// Apply returns ApplyVal
+func (cm *Manager) Apply(configtx *cb.Envelope) error {
+	cm.AppliedConfigUpdateEnvelope = configtx
+	return cm.ApplyVal
 }
 
-// Validate panics
-func (cm *Manager) Validate(configtx *cb.ConfigEnvelope) error {
-	panic("Unimplemented")
-
+// Validate returns ValidateVal
+func (cm *Manager) Validate(configtx *cb.Envelope) error {
+	return cm.ValidateVal
 }

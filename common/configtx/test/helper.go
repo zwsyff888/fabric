@@ -23,6 +23,7 @@ import (
 	"github.com/hyperledger/fabric/common/configtx"
 	configtxapplication "github.com/hyperledger/fabric/common/configtx/handlers/application"
 	configtxmsp "github.com/hyperledger/fabric/common/configtx/handlers/msp"
+	configtxorderer "github.com/hyperledger/fabric/common/configtx/handlers/orderer"
 	genesisconfig "github.com/hyperledger/fabric/common/configtx/tool/localconfig"
 	"github.com/hyperledger/fabric/common/configtx/tool/provisional"
 	"github.com/hyperledger/fabric/common/genesis"
@@ -84,21 +85,29 @@ func OrdererTemplate() configtx.Template {
 	return provisional.New(genConf).ChannelTemplate()
 }
 
-// MSPTemplate returns the test MSP template
-func MSPTemplate() configtx.Template {
-	mspConf, err := msp.GetLocalMspConfig(sampleMSPPath, "SAMPLE")
+// sampleOrgID apparently _must_ be set to DEFAULT or things break
+// Beware when changing!
+const sampleOrgID = "DEFAULT"
+
+// ApplicationOrgTemplate returns the SAMPLE org with MSP template
+func ApplicationOrgTemplate() configtx.Template {
+	mspConf, err := msp.GetLocalMspConfig(sampleMSPPath, sampleOrgID)
 	if err != nil {
 		logger.Panicf("Could not load sample MSP config: %s", err)
 	}
-	return configtx.NewSimpleTemplate(configtxmsp.TemplateGroupMSP([]string{configtxapplication.GroupKey}, mspConf))
+	return configtx.NewSimpleTemplate(configtxmsp.TemplateGroupMSP([]string{configtxapplication.GroupKey, sampleOrgID}, mspConf))
 }
 
-// ApplicationTemplate returns the test application template
-func ApplicationTemplate() configtx.Template {
-	return configtx.NewSimpleTemplate(configtxapplication.DefaultAnchorPeers())
+// OrdererOrgTemplate returns the SAMPLE org with MSP template
+func OrdererOrgTemplate() configtx.Template {
+	mspConf, err := msp.GetLocalMspConfig(sampleMSPPath, sampleOrgID)
+	if err != nil {
+		logger.Panicf("Could not load sample MSP config: %s", err)
+	}
+	return configtx.NewSimpleTemplate(configtxmsp.TemplateGroupMSP([]string{configtxorderer.GroupKey, sampleOrgID}, mspConf))
 }
 
 // CompositeTemplate returns the composite template of peer, orderer, and MSP
 func CompositeTemplate() configtx.Template {
-	return configtx.NewCompositeTemplate(MSPTemplate(), OrdererTemplate(), ApplicationTemplate())
+	return configtx.NewCompositeTemplate(OrdererTemplate(), ApplicationOrgTemplate(), OrdererOrgTemplate())
 }

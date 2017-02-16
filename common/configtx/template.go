@@ -65,7 +65,7 @@ func (st *simpleTemplate) Envelope(chainID string) (*cb.ConfigUpdateEnvelope, er
 	config, err := proto.Marshal(&cb.ConfigUpdate{
 		Header: &cb.ChannelHeader{
 			ChannelId: chainID,
-			Type:      int32(cb.HeaderType_CONFIGURATION_ITEM),
+			Type:      int32(cb.HeaderType_CONFIG),
 		},
 		WriteSet: st.configGroup,
 	})
@@ -141,7 +141,7 @@ func (ct *compositeTemplate) Envelope(chainID string) (*cb.ConfigUpdateEnvelope,
 	marshaledConfig, err := proto.Marshal(&cb.ConfigUpdate{
 		Header: &cb.ChannelHeader{
 			ChannelId: chainID,
-			Type:      int32(cb.HeaderType_CONFIGURATION_ITEM),
+			Type:      int32(cb.HeaderType_CONFIG),
 		},
 		WriteSet: channel,
 	})
@@ -188,11 +188,31 @@ func MakeChainCreationTransaction(creationPolicy string, chainID string, signer 
 		return nil, err
 	}
 
-	newConfigEnv := &cb.ConfigEnvelope{
-		LastUpdate: newConfigUpdateEnv,
+	configUpdate, err := UnmarshalConfigUpdate(newConfigUpdateEnv.ConfigUpdate)
+	if err != nil {
+		return nil, err
 	}
 
-	payloadChannelHeader := utils.MakeChannelHeader(cb.HeaderType_CONFIGURATION_TRANSACTION, msgVersion, chainID, epoch)
+	newConfigEnv := &cb.ConfigEnvelope{
+		// Config is an XXX temporary workaround until the orderer generates the real configtx from the WriteSet
+		Config: &cb.Config{
+			Header:  configUpdate.Header,
+			Channel: configUpdate.WriteSet,
+		},
+		LastUpdate: &cb.Envelope{
+			Payload: utils.MarshalOrPanic(&cb.Payload{
+				Header: &cb.Header{
+					ChannelHeader: &cb.ChannelHeader{
+						ChannelId: chainID,
+						Type:      int32(cb.HeaderType_CONFIG_UPDATE),
+					},
+				},
+				Data: utils.MarshalOrPanic(newConfigUpdateEnv),
+			}),
+		},
+	}
+
+	payloadChannelHeader := utils.MakeChannelHeader(cb.HeaderType_CONFIG, msgVersion, chainID, epoch)
 	payloadSignatureHeader := utils.MakeSignatureHeader(sSigner, utils.CreateNonceOrPanic())
 	payloadHeader := utils.MakePayloadHeader(payloadChannelHeader, payloadSignatureHeader)
 	payload := &cb.Payload{Header: payloadHeader, Data: utils.MarshalOrPanic(newConfigEnv)}

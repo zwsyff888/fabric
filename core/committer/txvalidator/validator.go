@@ -43,7 +43,7 @@ type Support interface {
 	MSPManager() msp.MSPManager
 
 	// Apply attempts to apply a configtx to become the new config
-	Apply(configtx *common.ConfigEnvelope) error
+	Apply(configtx *common.Envelope) error
 }
 
 //Validator interface which defines API to validate block transactions
@@ -141,7 +141,7 @@ func (v *txValidator) Validate(block *common.Block) error {
 						logger.Errorf("VSCCValidateTx for transaction txId = %s returned error %s", txID, err)
 						continue
 					}
-				} else if common.HeaderType(payload.Header.ChannelHeader.Type) == common.HeaderType_CONFIGURATION_TRANSACTION {
+				} else if common.HeaderType(payload.Header.ChannelHeader.Type) == common.HeaderType_CONFIG {
 					configEnvelope, err := configtx.UnmarshalConfigEnvelope(payload.Data)
 					if err != nil {
 						err := fmt.Errorf("Error unmarshaling config which passed initial validity checks: %s", err)
@@ -149,7 +149,7 @@ func (v *txValidator) Validate(block *common.Block) error {
 						return err
 					}
 
-					if err := v.support.Apply(configEnvelope); err != nil {
+					if err := v.support.Apply(configEnvelope.LastUpdate); err != nil {
 						err := fmt.Errorf("Error validating config which passed initial validity checks: %s", err)
 						logger.Critical(err)
 						return err

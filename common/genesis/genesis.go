@@ -17,6 +17,7 @@ limitations under the License.
 package genesis
 
 import (
+	"github.com/golang/protobuf/proto"
 	"github.com/hyperledger/fabric/common/configtx"
 	cb "github.com/hyperledger/fabric/protos/common"
 	"github.com/hyperledger/fabric/protos/utils"
@@ -48,16 +49,22 @@ func (f *factory) Block(chainID string) (*cb.Block, error) {
 		return nil, err
 	}
 
-	payloadChannelHeader := utils.MakeChannelHeader(cb.HeaderType_CONFIGURATION_TRANSACTION, msgVersion, chainID, epoch)
+	configUpdate := &cb.ConfigUpdate{}
+	err = proto.Unmarshal(configEnv.ConfigUpdate, configUpdate)
+	if err != nil {
+		return nil, err
+	}
+
+	payloadChannelHeader := utils.MakeChannelHeader(cb.HeaderType_CONFIG, msgVersion, chainID, epoch)
 	payloadSignatureHeader := utils.MakeSignatureHeader(nil, utils.CreateNonceOrPanic())
 	payloadHeader := utils.MakePayloadHeader(payloadChannelHeader, payloadSignatureHeader)
-	payload := &cb.Payload{Header: payloadHeader, Data: utils.MarshalOrPanic(&cb.ConfigEnvelope{LastUpdate: configEnv})}
+	payload := &cb.Payload{Header: payloadHeader, Data: utils.MarshalOrPanic(&cb.ConfigEnvelope{Config: &cb.Config{Header: configUpdate.Header, Channel: configUpdate.WriteSet}})}
 	envelope := &cb.Envelope{Payload: utils.MarshalOrPanic(payload), Signature: nil}
 
 	block := cb.NewBlock(0, nil)
 	block.Data = &cb.BlockData{Data: [][]byte{utils.MarshalOrPanic(envelope)}}
 	block.Header.DataHash = block.Data.Hash()
-	block.Metadata.Metadata[cb.BlockMetadataIndex_LAST_CONFIGURATION] = utils.MarshalOrPanic(&cb.Metadata{
+	block.Metadata.Metadata[cb.BlockMetadataIndex_LAST_CONFIG] = utils.MarshalOrPanic(&cb.Metadata{
 		Value: utils.MarshalOrPanic(&cb.LastConfig{Index: 0}),
 	})
 	return block, nil

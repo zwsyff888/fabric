@@ -38,11 +38,6 @@ var compositeKeySep = []byte{0x00}
 var lastKeyIndicator = byte(0x01)
 var savePointKey = []byte{0x00}
 
-var dataWrapper = "data"
-var jsonQuerySort = "sort"
-var jsonQueryFields = "fields"
-var jsonQuerySelector = "selector"
-
 // VersionedDBProvider implements interface VersionedDBProvider
 type VersionedDBProvider struct {
 	couchInstance *couchdb.CouchInstance
@@ -229,12 +224,14 @@ func (vdb *VersionedDB) GetStateRangeScanIterator(namespace string, startKey str
 }
 
 // ExecuteQuery implements method in VersionedDB interface
-func (vdb *VersionedDB) ExecuteQuery(query string) (statedb.ResultsIterator, error) {
+func (vdb *VersionedDB) ExecuteQuery(namespace, query string) (statedb.ResultsIterator, error) {
 
 	//TODO - limit is currently set at 1000,  eventually this will need to be changed
 	//to reflect a config option and potentially return an exception if the threshold is exceeded
 	// skip (paging) is not utilized by fabric
-	queryResult, err := vdb.db.QueryDocuments(string(ApplyQueryWrapper(query)), 1000, 0)
+	queryString := ApplyQueryWrapper(namespace, query)
+
+	queryResult, err := vdb.db.QueryDocuments(queryString, 1000, 0)
 	if err != nil {
 		logger.Debugf("Error calling QueryDocuments(): %s\n", err.Error())
 		return nil, err

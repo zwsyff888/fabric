@@ -17,10 +17,8 @@ limitations under the License.
 package configtx
 
 import (
-	"errors"
 	"fmt"
 	"regexp"
-	"strings"
 
 	"github.com/hyperledger/fabric/common/configtx/api"
 	"github.com/hyperledger/fabric/common/policies"
@@ -58,6 +56,7 @@ type configManager struct {
 	config       map[string]comparable
 	callOnUpdate []func(api.Manager)
 	initializer  api.Initializer
+	configEnv    *cb.ConfigEnvelope
 }
 
 func computeSequence(configGroup *cb.ConfigGroup) uint64 {
@@ -75,32 +74,6 @@ func computeSequence(configGroup *cb.ConfigGroup) uint64 {
 	}
 
 	return max
-}
-
-// computeChannelIdAndSequence returns the chain id and the sequence number for a config envelope
-// or an error if there is a problem with the config envelope
-func computeChannelIdAndSequence(config *cb.ConfigUpdate) (string, uint64, error) {
-	if config.WriteSet == nil {
-		return "", 0, errors.New("Empty envelope unsupported")
-	}
-
-	if config.Header == nil {
-		return "", 0, fmt.Errorf("Header not set")
-	}
-
-	if config.Header.ChannelId == "" {
-		return "", 0, fmt.Errorf("Header chainID was not set")
-	}
-
-	chainID := config.Header.ChannelId
-
-	if err := validateChainID(chainID); err != nil {
-		return "", 0, err
-	}
-
-	m := computeSequence(config.WriteSet)
-
-	return chainID, m, nil
 }
 
 // validateChainID makes sure that proposed chain IDs (i.e. channel names)
@@ -133,37 +106,43 @@ func validateChainID(chainID string) error {
 	return nil
 }
 
-func NewManagerImpl(configtx *cb.ConfigEnvelope, initializer api.Initializer, callOnUpdate []func(api.Manager)) (api.Manager, error) {
-	// XXX as a temporary hack to get the new protos working, we assume entire config is always in the ConfigUpdate.WriteSet
-
-	if configtx.LastUpdate == nil {
-		return nil, fmt.Errorf("Must have ConfigEnvelope.LastUpdate set")
+func NewManagerImpl(configEnv *cb.ConfigEnvelope, initializer api.Initializer, callOnUpdate []func(api.Manager)) (api.Manager, error) {
+	if configEnv == nil {
+		return nil, fmt.Errorf("Nil config envelope")
 	}
 
-	config, err := UnmarshalConfigUpdate(configtx.LastUpdate.ConfigUpdate)
-	if err != nil {
-		return nil, err
+	if configEnv.Config == nil {
+		return nil, fmt.Errorf("Nil config envelope Config")
 	}
 
-	chainID, seq, err := computeChannelIdAndSequence(config)
+	if configEnv.Config.Header == nil {
+		return nil, fmt.Errorf("Nil config envelop Config Header")
+	}
+
+	if err := validateChainID(configEnv.Config.Header.ChannelId); err != nil {
+		return nil, fmt.Errorf("Bad channel id: %s", err)
+	}
+
+	configMap, err := mapConfig(configEnv.Config.Channel)
 	if err != nil {
-		return nil, fmt.Errorf("Error computing chain ID and sequence: %s", err)
+		return nil, fmt.Errorf("Error converting config to map: %s", err)
 	}
 
 	cm := &configManager{
 		Resources:    initializer,
 		initializer:  initializer,
-		sequence:     seq - 1,
-		chainID:      chainID,
-		config:       make(map[string]comparable),
+		sequence:     computeSequence(configEnv.Config.Channel),
+		chainID:      configEnv.Config.Header.ChannelId,
+		config:       configMap,
 		callOnUpdate: callOnUpdate,
 	}
 
-	err = cm.Apply(configtx)
-
-	if err != nil {
-		return nil, fmt.Errorf("Error applying config transaction: %s", err)
+	cm.beginHandlers()
+	if err := cm.proposeConfig(configMap); err != nil {
+		cm.rollbackHandlers()
+		return nil, err
 	}
+	cm.commitHandlers()
 
 	return cm, nil
 }
@@ -186,83 +165,50 @@ func (cm *configManager) commitHandlers() {
 	}
 }
 
-func (cm *configManager) recurseConfig(result map[string]comparable, path []string, group *cb.ConfigGroup) error {
-
-	for key, group := range group.Groups {
-		// TODO rename validateChainID to validateConfigID
-		if err := validateChainID(key); err != nil {
-			return fmt.Errorf("Illegal characters in group key: %s", key)
+func (cm *configManager) proposeConfig(config map[string]comparable) error {
+	for fqPath, c := range config {
+		logger.Debugf("Proposing: %s", fqPath)
+		switch {
+		case c.ConfigValue != nil:
+			valueHandler, err := cm.initializer.Handler(c.path)
+			if err != nil {
+				return err
+			}
+			if err := valueHandler.ProposeConfig(c.key, c.ConfigValue); err != nil {
+				return err
+			}
+		case c.ConfigPolicy != nil:
+			if err := cm.initializer.PolicyHandler().ProposePolicy(c.key, c.path, c.ConfigPolicy); err != nil {
+				return err
+			}
 		}
-
-		if err := cm.recurseConfig(result, append(path, key), group); err != nil {
-			return err
-		}
-
-		// TODO, uncomment to validate version validation on groups
-		// result["[Groups]"+strings.Join(path, ".")+key] = comparable{path: path, ConfigGroup: group}
-	}
-
-	valueHandler, err := cm.initializer.Handler(path)
-	if err != nil {
-		return err
-	}
-
-	for key, value := range group.Values {
-		if err := validateChainID(key); err != nil {
-			return fmt.Errorf("Illegal characters in values key: %s", key)
-		}
-
-		err := valueHandler.ProposeConfig(key, &cb.ConfigValue{
-			Value: value.Value,
-		})
-		if err != nil {
-			return err
-		}
-
-		result["[Values]"+strings.Join(path, ".")+key] = comparable{path: path, ConfigValue: value}
-	}
-
-	logger.Debugf("Found %d policies", len(group.Policies))
-	for key, policy := range group.Policies {
-		if err := validateChainID(key); err != nil {
-			return fmt.Errorf("Illegal characters in policies key: %s", key)
-		}
-
-		logger.Debugf("Proposing policy: %s", key)
-		err := cm.initializer.PolicyProposer().ProposeConfig(key, &cb.ConfigValue{
-			// TODO, fix policy interface to take the policy directly
-			Value: utils.MarshalOrPanic(policy.Policy),
-		})
-
-		if err != nil {
-			return err
-		}
-
-		// TODO, uncomment to validate version validation on policies
-		//result["[Policies]"+strings.Join(path, ".")+key] = comparable{path: path, ConfigPolicy: policy}
 	}
 
 	return nil
 }
 
-func (cm *configManager) processConfig(configtx *cb.ConfigEnvelope) (configMap map[string]comparable, err error) {
-	// XXX as a temporary hack to get the new protos working, we assume entire config is always in the ConfigUpdate.WriteSet
-
-	if configtx.LastUpdate == nil {
-		return nil, fmt.Errorf("Must have ConfigEnvelope.LastUpdate set")
+// authorizeUpdate validates that all modified config has the corresponding modification policies satisfied by the signature set
+// it returns a map of the modified config
+func (cm *configManager) authorizeUpdate(configUpdateEnv *cb.ConfigUpdateEnvelope) (map[string]comparable, error) {
+	if configUpdateEnv == nil {
+		return nil, fmt.Errorf("Cannot process nil ConfigUpdateEnvelope")
 	}
 
-	config, err := UnmarshalConfigUpdate(configtx.LastUpdate.ConfigUpdate)
+	config, err := UnmarshalConfigUpdate(configUpdateEnv.ConfigUpdate)
 	if err != nil {
 		return nil, err
 	}
 
-	chainID, seq, err := computeChannelIdAndSequence(config)
+	if config.Header == nil {
+		return nil, fmt.Errorf("Must have header set")
+	}
+
+	seq := computeSequence(config.WriteSet)
 	if err != nil {
 		return nil, err
 	}
 
-	signedData, err := configtx.LastUpdate.AsSignedData()
+	signedData, err := configUpdateEnv.AsSignedData()
 	if err != nil {
 		return nil, err
 	}
@@ -273,25 +219,20 @@ func (cm *configManager) processConfig(configtx *cb.ConfigEnvelope) (configMap m
 	}
 
 	// Verify config is intended for this globally unique chain ID
-	if chainID != cm.chainID {
-		return nil, fmt.Errorf("Config is for the wrong chain, expected %s, got %s", cm.chainID, chainID)
+	if config.Header.ChannelId != cm.chainID {
+		return nil, fmt.Errorf("Config is for the wrong chain, expected %s, got %s", cm.chainID, config.Header.ChannelId)
 	}
 
-	defaultModificationPolicy, defaultPolicySet := cm.PolicyManager().GetPolicy(NewConfigItemPolicyKey)
-
-	// If the default modification policy is not set, it indicates this is an uninitialized chain, so be permissive of modification
-	if !defaultPolicySet {
-		defaultModificationPolicy = &acceptAllPolicy{}
-	}
-
-	configMap = make(map[string]comparable)
-
-	if err := cm.recurseConfig(configMap, []string{}, config.WriteSet); err != nil {
+	configMap, err := mapConfig(config.WriteSet)
+	if err != nil {
 		return nil, err
 	}
-
 	for key, value := range configMap {
 		logger.Debugf("Processing key %s with value %v", key, value)
+		if key == "[Groups] /Channel" {
+			// XXX temporary hack to prevent group evaluation for modification
+			continue
+		}
 
 		// Ensure the config sequence numbers are correct to prevent replay attacks
 		var isModified bool
@@ -308,25 +249,23 @@ func (cm *configManager) processConfig(configtx *cb.ConfigEnvelope) (configMap m
 
 		// If a config item was modified, its Version must be set correctly, and it must satisfy the modification policy
 		if isModified {
-			logger.Debugf("Proposed config item %s on channel %s has been modified", key, chainID)
+			logger.Debugf("Proposed config item %s on channel %s has been modified", key, cm.chainID)
 
 			if value.version() != seq {
 				return nil, fmt.Errorf("Key %s was modified, but its Version %d does not equal current configtx Sequence %d", key, value.version(), seq)
 			}
 
 			// Get the modification policy for this config item if one was previously specified
-			// or the default if this is a new config item
+			// or accept it if it is new, as the group policy will be evaluated for its inclusion
 			var policy policies.Policy
 			if ok {
 				policy, _ = cm.PolicyManager().GetPolicy(oldValue.modPolicy())
-			} else {
-				policy = defaultModificationPolicy
+				// Ensure the policy is satisfied
+				if err = policy.Evaluate(signedData); err != nil {
+					return nil, err
+				}
 			}
 
-			// Ensure the policy is satisfied
-			if err = policy.Evaluate(signedData); err != nil {
-				return nil, err
-			}
 		}
 	}
 
@@ -340,21 +279,74 @@ func (cm *configManager) processConfig(configtx *cb.ConfigEnvelope) (configMap m
 	}
 
 	return configMap, nil
+}
 
+// computeUpdateResult takes a configMap generated by an update and produces a new configMap overlaying it onto the old config
+func (cm *configManager) computeUpdateResult(updatedConfig map[string]comparable) map[string]comparable {
+	newConfigMap := make(map[string]comparable)
+	for key, value := range cm.config {
+		newConfigMap[key] = value
+	}
+
+	for key, value := range updatedConfig {
+		newConfigMap[key] = value
+	}
+	return newConfigMap
+}
+
+func (cm *configManager) processConfig(configtx *cb.ConfigUpdateEnvelope) (map[string]comparable, error) {
+	cm.beginHandlers()
+	configMap, err := cm.authorizeUpdate(configtx)
+	if err != nil {
+		return nil, err
+	}
+	computedResult := cm.computeUpdateResult(configMap)
+	if err := cm.proposeConfig(computedResult); err != nil {
+		return nil, err
+	}
+	return computedResult, nil
+}
+
+func envelopeToConfigUpdate(configtx *cb.Envelope) (*cb.ConfigUpdateEnvelope, error) {
+	payload, err := utils.UnmarshalPayload(configtx.Payload)
+	if err != nil {
+		return nil, err
+	}
+
+	if payload.Header == nil || payload.Header.ChannelHeader == nil {
+		return nil, fmt.Errorf("Envelope must have ChannelHeader")
+	}
+
+	if payload.Header == nil || payload.Header.ChannelHeader.Type != int32(cb.HeaderType_CONFIG_UPDATE) {
+		return nil, fmt.Errorf("Not a tx of type CONFIG_UPDATE")
+	}
+
+	configUpdateEnv, err := UnmarshalConfigUpdateEnvelope(payload.Data)
+	if err != nil {
+		return nil, fmt.Errorf("Error unmarshaling ConfigUpdateEnvelope: %s", err)
+	}
+
+	return configUpdateEnv, nil
 }
 
 // Validate attempts to validate a new configtx against the current config state
-func (cm *configManager) Validate(configtx *cb.ConfigEnvelope) error {
-	cm.beginHandlers()
-	_, err := cm.processConfig(configtx)
+func (cm *configManager) Validate(configtx *cb.Envelope) error {
+	configUpdateEnv, err := envelopeToConfigUpdate(configtx)
+	if err != nil {
+		return err
+	}
+	_, err = cm.processConfig(configUpdateEnv)
 	cm.rollbackHandlers()
 	return err
 }
 
 // Apply attempts to apply a configtx to become the new config
-func (cm *configManager) Apply(configtx *cb.ConfigEnvelope) error {
-	cm.beginHandlers()
-	configMap, err := cm.processConfig(configtx)
+func (cm *configManager) Apply(configtx *cb.Envelope) error {
+	configUpdateEnv, err := envelopeToConfigUpdate(configtx)
+	if err != nil {
+		return err
+	}
+	configMap, err := cm.processConfig(configUpdateEnv)
 	if err != nil {
 		cm.rollbackHandlers()
 		return err
@@ -362,7 +354,24 @@ func (cm *configManager) Apply(configtx *cb.ConfigEnvelope) error {
 	cm.config = configMap
 	cm.sequence++
 	cm.commitHandlers()
+	channelGroup, err := configMapToConfig(configMap)
+	if err != nil {
+		logger.Panicf("Config was validated and applied, but could not be transformed back into proto form: %s", err)
+	}
+
+	cm.configEnv = &cb.ConfigEnvelope{
+		Config: &cb.Config{
+			// XXX add header
+			Channel: channelGroup,
+		},
+		LastUpdate: configtx,
+	}
 	return nil
+}
+
+// ConfigEnvelope retrieve the current ConfigEnvelope, generated after the last successfully applied configuration
+func (cm *configManager) ConfigEnvelope() *cb.ConfigEnvelope {
+	return cm.configEnv
 }
 
 // ChainID retrieves the chain ID associated with this manager

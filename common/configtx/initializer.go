@@ -17,6 +17,8 @@ limitations under the License.
 package configtx
 
 import (
+	"fmt"
+
 	"github.com/hyperledger/fabric/common/cauthdsl"
 	"github.com/hyperledger/fabric/common/configtx/api"
 	configtxapplication "github.com/hyperledger/fabric/common/configtx/handlers/application"
@@ -129,10 +131,20 @@ func (i *initializer) CommitConfig() {
 	i.mspConfigHandler.CommitConfig()
 }
 
-func (i *initializer) PolicyProposer() api.Handler {
+func (i *initializer) PolicyHandler() api.PolicyHandler {
 	return i.policyManager
 }
 
 func (i *initializer) Handler(path []string) (api.Handler, error) {
-	return i.channelConfig.Handler(path)
+	if len(path) == 0 {
+		return nil, fmt.Errorf("Empty path")
+	}
+
+	switch path[0] {
+	case RootGroupKey:
+		return i.channelConfig.Handler(path[1:])
+	default:
+		return nil, fmt.Errorf("Unknown root group: %s", path[0])
+	}
+
 }

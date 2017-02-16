@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package application
+package handlers
 
 import (
 	"testing"
@@ -28,36 +28,36 @@ func init() {
 	logging.SetLevel(logging.DEBUG, "")
 }
 
-func TestApplicationInterface(t *testing.T) {
-	_ = configtxapi.ApplicationConfig(NewSharedConfigImpl(nil))
+func TestInterface(t *testing.T) {
+	_ = configtxapi.SubInitializer(NewOrgConfig("id", nil))
 }
 
-func TestApplicationDoubleBegin(t *testing.T) {
+func TestDoubleBegin(t *testing.T) {
 	defer func() {
 		if err := recover(); err == nil {
 			t.Fatalf("Should have panicked on multiple begin configs")
 		}
 	}()
 
-	m := NewSharedConfigImpl(nil)
+	m := NewOrgConfig("id", nil)
 	m.BeginConfig()
 	m.BeginConfig()
 }
 
-func TestApplicationCommitWithoutBegin(t *testing.T) {
+func TestCommitWithoutBegin(t *testing.T) {
 	defer func() {
 		if err := recover(); err == nil {
 			t.Fatalf("Should have panicked on multiple begin configs")
 		}
 	}()
 
-	m := NewSharedConfigImpl(nil)
+	m := NewOrgConfig("id", nil)
 	m.CommitConfig()
 }
 
-func TestApplicationRollback(t *testing.T) {
-	m := NewSharedConfigImpl(nil)
-	m.pendingConfig = &sharedConfig{}
+func TestRollback(t *testing.T) {
+	m := NewOrgConfig("id", nil)
+	m.pendingConfig = &orgConfig{}
 	m.RollbackConfig()
 	if m.pendingConfig != nil {
 		t.Fatalf("Should have cleared pending config on rollback")

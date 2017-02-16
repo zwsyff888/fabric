@@ -40,10 +40,16 @@ type ChannelConfig interface {
 	OrdererAddresses() []string
 }
 
-// ApplicationConfig stores the common shared application config
-type ApplicationConfig interface {
+// ApplicationOrgConfig stores the per org application config
+type ApplicationOrgConfig interface {
 	// AnchorPeers returns the list of gossip anchor peers
 	AnchorPeers() []*pb.AnchorPeer
+}
+
+// ApplicationConfig stores the common shared application config
+type ApplicationConfig interface {
+	// Organizations returns a map of org ID to ApplicationOrgConfig
+	Organizations() map[string]ApplicationOrgConfig
 }
 
 // OrdererConfig stores the common shared orderer config
@@ -74,6 +80,7 @@ type OrdererConfig interface {
 }
 
 // Handler provides a hook which allows other pieces of code to participate in config proposals
+// TODO, this should probably be renamed to ValueHandler
 type Handler interface {
 	// ProposeConfig called when config is added to a proposal
 	ProposeConfig(key string, configValue *cb.ConfigValue) error
@@ -84,10 +91,13 @@ type Manager interface {
 	Resources
 
 	// Apply attempts to apply a configtx to become the new config
-	Apply(configtx *cb.ConfigEnvelope) error
+	Apply(configtx *cb.Envelope) error
 
 	// Validate attempts to validate a new configtx against the current config state
-	Validate(configtx *cb.ConfigEnvelope) error
+	Validate(configtx *cb.Envelope) error
+
+	// ConfigEnvelope returns the *cb.ConfigEnvelope from the last successful Apply
+	ConfigEnvelope() *cb.ConfigEnvelope
 
 	// ChainID retrieves the chain ID associated with this manager
 	ChainID() string
@@ -116,8 +126,8 @@ type Resources interface {
 	MSPManager() msp.MSPManager
 }
 
-// SubInitializer is used downstream from initializer
-type SubInitializer interface {
+// Transactional is an interface which allows for an update to be proposed and rolled back
+type Transactional interface {
 	// BeginConfig called when a config proposal is begun
 	BeginConfig()
 
@@ -126,9 +136,21 @@ type SubInitializer interface {
 
 	// CommitConfig called when a config proposal is committed
 	CommitConfig()
+}
+
+// SubInitializer is used downstream from initializer
+type SubInitializer interface {
+	Transactional
 
 	// Handler returns the associated value handler for a given config path
 	Handler(path []string) (Handler, error)
+}
+
+// PolicyHandler is used for config updates to policy
+type PolicyHandler interface {
+	Transactional
+
+	ProposePolicy(key string, path []string, policy *cb.ConfigPolicy) error
 }
 
 // Initializer is used as indirection between Manager and Handler to allow
@@ -138,6 +160,6 @@ type Initializer interface {
 
 	Resources
 
-	// PolicyProposer as a Handler is a temporary hack
-	PolicyProposer() Handler
+	// PolicyProposer returns the PolicyHandler to handle updates to policy
+	PolicyHandler() PolicyHandler
 }

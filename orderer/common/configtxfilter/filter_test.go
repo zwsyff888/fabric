@@ -24,35 +24,13 @@ import (
 	mockconfigtx "github.com/hyperledger/fabric/common/mocks/configtx"
 	"github.com/hyperledger/fabric/orderer/common/filter"
 	cb "github.com/hyperledger/fabric/protos/common"
+	"github.com/hyperledger/fabric/protos/utils"
 
 	"github.com/golang/protobuf/proto"
 )
 
-type mockConfigManager struct {
-	mockconfigtx.Manager
-	applied *cb.ConfigEnvelope
-	err     error
-}
-
-func (mcm *mockConfigManager) Validate(configtx *cb.ConfigEnvelope) error {
-	return mcm.err
-}
-
-func (mcm *mockConfigManager) Apply(configtx *cb.ConfigEnvelope) error {
-	mcm.applied = configtx
-	return mcm.err
-}
-
-func (mcm *mockConfigManager) ChainID() string {
-	panic("Unimplemented")
-}
-
-func (mcm *mockConfigManager) Sequence() uint64 {
-	panic("Unimplemented")
-}
-
 func TestForwardNonConfig(t *testing.T) {
-	cf := NewFilter(&mockConfigManager{})
+	cf := NewFilter(&mockconfigtx.Manager{})
 	result, _ := cf.Apply(&cb.Envelope{
 		Payload: []byte("Opaque"),
 	})
@@ -62,11 +40,27 @@ func TestForwardNonConfig(t *testing.T) {
 }
 
 func TestAcceptGoodConfig(t *testing.T) {
-	mcm := &mockConfigManager{}
+	mcm := &mockconfigtx.Manager{}
 	cf := NewFilter(mcm)
-	configEnv := &cb.ConfigEnvelope{}
-	config, _ := proto.Marshal(configEnv)
-	configBytes, _ := proto.Marshal(&cb.Payload{Header: &cb.Header{ChannelHeader: &cb.ChannelHeader{Type: int32(cb.HeaderType_CONFIGURATION_TRANSACTION)}}, Data: config})
+	configGroup := cb.NewConfigGroup()
+	configGroup.Values["Foo"] = &cb.ConfigValue{}
+	configUpdateEnv := &cb.ConfigUpdateEnvelope{
+		ConfigUpdate: utils.MarshalOrPanic(configGroup),
+	}
+	configEnv := &cb.ConfigEnvelope{
+		LastUpdate: &cb.Envelope{
+			Payload: utils.MarshalOrPanic(&cb.Payload{
+				Header: &cb.Header{
+					ChannelHeader: &cb.ChannelHeader{
+						Type: int32(cb.HeaderType_CONFIG_UPDATE),
+					},
+				},
+				Data: utils.MarshalOrPanic(configUpdateEnv),
+			}),
+		},
+	}
+	configEnvBytes := utils.MarshalOrPanic(configEnv)
+	configBytes := utils.MarshalOrPanic(&cb.Payload{Header: &cb.Header{ChannelHeader: &cb.ChannelHeader{Type: int32(cb.HeaderType_CONFIG)}}, Data: configEnvBytes})
 	configEnvelope := &cb.Envelope{
 		Payload: configBytes,
 	}
@@ -81,15 +75,15 @@ func TestAcceptGoodConfig(t *testing.T) {
 
 	committer.Commit()
 
-	if !reflect.DeepEqual(mcm.applied, configEnv) {
-		t.Fatalf("Should have applied new config on commit got %v and %v", mcm.applied, configEnv)
+	if !reflect.DeepEqual(mcm.AppliedConfigUpdateEnvelope, configEnv.LastUpdate) {
+		t.Fatalf("Should have applied new config on commit got %+v and %+v", mcm.AppliedConfigUpdateEnvelope, configEnv.LastUpdate)
 	}
 }
 
 func TestRejectBadConfig(t *testing.T) {
-	cf := NewFilter(&mockConfigManager{err: fmt.Errorf("Error")})
+	cf := NewFilter(&mockconfigtx.Manager{ValidateVal: fmt.Errorf("Error")})
 	config, _ := proto.Marshal(&cb.ConfigEnvelope{})
-	configBytes, _ := proto.Marshal(&cb.Payload{Header: &cb.Header{ChannelHeader: &cb.ChannelHeader{Type: int32(cb.HeaderType_CONFIGURATION_TRANSACTION)}}, Data: config})
+	configBytes, _ := proto.Marshal(&cb.Payload{Header: &cb.Header{ChannelHeader: &cb.ChannelHeader{Type: int32(cb.HeaderType_CONFIG)}}, Data: config})
 	result, _ := cf.Apply(&cb.Envelope{
 		Payload: configBytes,
 	})
