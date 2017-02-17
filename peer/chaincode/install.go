@@ -83,6 +83,7 @@ func install(chaincodeName string, chaincodeVersion string, cds *pb.ChaincodeDep
 
 // chaincodeInstall installs the chaincode. If remoteinstall, does it via a lccc call
 func chaincodeInstall(cmd *cobra.Command, args []string, cf *ChaincodeCmdFactory) error {
+	logger.Infof("chaincodeInstall %v %v", args, cf)
 	if chaincodePath == common.UndefinedParamValue || chaincodeVersion == common.UndefinedParamValue {
 		return fmt.Errorf("Must supply value for %s path and version parameters.\n", chainFuncName)
 	}

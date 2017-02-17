@@ -228,7 +228,9 @@ func newDuplicateChaincodeHandlerError(chaincodeHandler *Handler) error {
 
 func (chaincodeSupport *ChaincodeSupport) registerHandler(chaincodehandler *Handler) error {
 	key := chaincodehandler.ChaincodeID.Name
-
+	if !strings.ContainsAny(key, ":") {
+		key = fmt.Sprint(key, ":0")
+	}
 	chaincodeSupport.runningChaincodes.Lock()
 	defer chaincodeSupport.runningChaincodes.Unlock()
 
@@ -240,6 +242,7 @@ func (chaincodeSupport *ChaincodeSupport) registerHandler(chaincodehandler *Hand
 	}
 	//a placeholder, unregistered handler will be setup by transaction processing that comes
 	//through via consensus. In this case we swap the handler and give it the notify channel
+	chaincodeLogger.Infof("chaincodeMap %v %value", key, chaincodeSupport.runningChaincodes.chaincodeMap)
 	if chrte2 != nil {
 		chaincodehandler.readyNotify = chrte2.handler.readyNotify
 		chrte2.handler = chaincodehandler

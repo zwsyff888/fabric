@@ -57,6 +57,7 @@ func GetChaincodePackage(ccname string, ccversion string) ([]byte, error) {
 	var ccbytes []byte
 	var err error
 	if ccbytes, err = ioutil.ReadFile(path); err != nil {
+		ccproviderLogger.Infof("ioutil.ReadFile %v %v %v", path, len(ccbytes), ccbytes)
 		return nil, err
 	}
 	return ccbytes, nil
@@ -96,6 +97,7 @@ func PutChaincodeIntoFS(depSpec *pb.ChaincodeDeploymentSpec) error {
 	}
 
 	b, err := proto.Marshal(depSpec)
+	ccproviderLogger.Infof("PutChaincodeIntoFS %v %v %v", len(b), path, depSpec)
 	if err != nil {
 		return fmt.Errorf("failed to marshal fs deployment spec for %s, %s", ccname, ccversion)
 	}

@@ -111,7 +111,7 @@ func (goPlatform *Platform) GetDeploymentPayload(spec *pb.ChaincodeSpec) ([]byte
 		return nil, err
 	}
 
-	err = writeChaincodePackage(spec, tw)
+	//err = writeChaincodePackage(spec, tw)
 
 	tw.Close()
 	gw.Close()

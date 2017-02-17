@@ -304,9 +304,11 @@ func (e *Endorser) ProcessProposal(ctx context.Context, signedProp *pb.SignedPro
 	var txsim ledger.TxSimulator
 	var historyQueryExecutor ledger.HistoryQueryExecutor
 	if chainID != "" {
+		endorserLogger.Infof("endorserLogger %v", chainID)
 		if txsim, err = e.getTxSimulator(chainID); err != nil {
 			return &pb.ProposalResponse{Response: &pb.Response{Status: 500, Message: err.Error()}}, err
 		}
+		endorserLogger.Infof("endorserLogger txsim %v", txsim)
 		if historyQueryExecutor, err = e.getHistoryQueryExecutor(chainID); err != nil {
 			return &pb.ProposalResponse{Response: &pb.Response{Status: 500, Message: err.Error()}}, err
 		}

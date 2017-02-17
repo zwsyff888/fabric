@@ -49,7 +49,7 @@ var logger = logging.MustGetLogger("chaincode-platform")
 
 // Find returns the platform interface for the given platform type
 func Find(chaincodeType pb.ChaincodeSpec_Type) (Platform, error) {
-
+	logger.Infof("find %v", chaincodeType)
 	switch chaincodeType {
 	case pb.ChaincodeSpec_GOLANG:
 		return &golang.Platform{}, nil

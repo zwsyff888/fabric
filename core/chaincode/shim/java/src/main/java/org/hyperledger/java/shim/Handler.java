@@ -63,16 +63,15 @@ public class Handler {
 		fsm.addEvents(
 				//				Event Name				Destination		Sources States
 				new EventDesc(REGISTERED.toString(), 	"established",	"created"),
-				new EventDesc(INIT.toString(), 			"init", 		"established"),
 				new EventDesc(READY.toString(), 		"ready", 		"established"),
 				new EventDesc(ERROR.toString(), 		"established", 	"init"),
 				new EventDesc(RESPONSE.toString(),		"init", 		"init"),
-				new EventDesc(COMPLETED.toString(), 	"ready", 		"init"),
-				new EventDesc(TRANSACTION.toString(),	"transaction", 	"ready"),
-				new EventDesc(COMPLETED.toString(), 	"ready", 		"transaction"),
-				new EventDesc(ERROR.toString(), 		"ready", 		"transaction"),
-				new EventDesc(RESPONSE.toString(), 		"transaction", 	"transaction"),
-				new EventDesc(RESPONSE.toString(), 		"ready", 		"ready")
+				new EventDesc(INIT.toString(),		    "ready", 		"ready"),
+				new EventDesc(TRANSACTION.toString(),	"ready", 	    "ready"),
+				new EventDesc(RESPONSE.toString(), 	    "ready", 		"ready"),
+				new EventDesc(ERROR.toString(), 		"ready", 		"ready"),
+				new EventDesc(COMPLETED.toString(), 	"ready", 	    "init"),
+				new EventDesc(COMPLETED.toString(), 	"ready", 		"ready")
 				);
 
 		fsm.addCallbacks(

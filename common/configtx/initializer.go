@@ -52,7 +52,7 @@ func (r *resources) ChannelConfig() api.ChannelConfig {
 func (r *resources) OrdererConfig() api.OrdererConfig {
 	return r.ordererConfig
 }
-
+	
 // ApplicationConfig returns the api.ApplicationConfig for the chain
 func (r *resources) ApplicationConfig() api.ApplicationConfig {
 	return r.applicationConfig

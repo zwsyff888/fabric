@@ -44,6 +44,7 @@ func Execute(ctxt context.Context, cccid *ccprovider.CCContext, spec interface{}
 		}
 		cctyp = pb.ChaincodeMessage_TRANSACTION
 	}
+	chaincodeLogger.Infof("Execute %v", cds)
 
 	cID, cMsg, err := theChaincodeSupport.Launch(ctxt, cccid, spec)
 	if err != nil {

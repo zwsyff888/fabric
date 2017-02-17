@@ -511,6 +511,7 @@ func (handler *Handler) beforeRegisterEvent(e *fsm.Event, state string) {
 
 	chaincodeLogger.Debugf("Got %s for chaincodeID = %s, sending back %s", e.Event, chaincodeID, pb.ChaincodeMessage_REGISTERED)
 	if err := handler.serialSend(&pb.ChaincodeMessage{Type: pb.ChaincodeMessage_REGISTERED}); err != nil {
+		chaincodeLogger.Debugf("Error sending %s: %s", pb.ChaincodeMessage_REGISTERED, err)
 		e.Cancel(fmt.Errorf("Error sending %s: %s", pb.ChaincodeMessage_REGISTERED, err))
 		handler.notifyDuringStartup(false)
 		return
@@ -1347,6 +1348,8 @@ func (handler *Handler) enterBusyState(e *fsm.Event, state string) {
 }
 
 func (handler *Handler) enterEstablishedState(e *fsm.Event, state string) {
+	chaincodeLogger.Infof("enterEstablishedState")
+	chaincodeLogger.Infof("enterEstablishedState %v", handler)
 	handler.notifyDuringStartup(true)
 }
 

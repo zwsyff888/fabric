@@ -123,6 +123,7 @@ func (javaPlatform *Platform) GenerateDockerfile(cds *pb.ChaincodeDeploymentSpec
 	var buf []string
 
 	buildCmd, err := getBuildCmd(cds.CodePackage)
+	logger.Infof("buildCmd %v", buildCmd)
 	if err != nil {
 		return "", err
 	}
@@ -134,7 +135,7 @@ func (javaPlatform *Platform) GenerateDockerfile(cds *pb.ChaincodeDeploymentSpec
 	buf = append(buf, "RUN  cp /root/chaincode/src/build/libs/* /root/libs")
 
 	dockerFileContents := strings.Join(buf, "\n")
-
+	logger.Infof("dockerFileContents %v", dockerFileContents)
 	return dockerFileContents, nil
 }
 

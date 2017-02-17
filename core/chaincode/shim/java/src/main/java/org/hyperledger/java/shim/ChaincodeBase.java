@@ -56,6 +56,7 @@ public abstract class ChaincodeBase {
 
 	private Handler handler;
 	private String id = getChaincodeID();
+	private String version;
 
 	// Start entry point for chaincodes bootstrap.
 	public void start(String[] args) {
@@ -64,6 +65,7 @@ public abstract class ChaincodeBase {
 		options.addOption("s", "securityEnabled", false, "Present if security is enabled");
 		options.addOption("i", "id", true, "Identity of chaincode");
 		options.addOption("o", "hostNameOverride", true, "Hostname override for server certificate");
+		options.addOption("v", "version", true, "Chaincode Version");
 		try {
 			CommandLine cl = new DefaultParser().parse(options, args);
 			if (cl.hasOption('a')) {
@@ -81,6 +83,9 @@ public abstract class ChaincodeBase {
 			}
 			if (cl.hasOption('i')) {
 				id = cl.getOptionValue('i');
+			}
+			if (cl.hasOption('v')) {
+				version = cl.getOptionValue('v');
 			}
 		} catch (Exception e) {
 			logger.warn("cli parsing failed with exception",e);
@@ -175,6 +180,7 @@ public abstract class ChaincodeBase {
 		// Send the ChaincodeID during register.
 		ChaincodeID chaincodeID = ChaincodeID.newBuilder()
 				.setName(id)//TODO params.get("chaincode.id.name"))
+				.setVersion(version)
 				.build();
 
 		ChaincodeMessage payload = ChaincodeMessage.newBuilder()
