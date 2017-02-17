@@ -19,6 +19,9 @@ package org.hyperledger.java.fsm;
 import java.util.HashMap;
 import java.util.HashSet;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+
 import org.hyperledger.java.fsm.exceptions.AsyncException;
 import org.hyperledger.java.fsm.exceptions.CancelledException;
 import org.hyperledger.java.fsm.exceptions.InTrasistionException;
@@ -29,6 +32,7 @@ import org.hyperledger.java.fsm.exceptions.UnknownEventException;
 
 public class FSM {
 
+	private static Log logger = LogFactory.getLog(FSM.class);
 	/** The current state of the FSM */
 	private String current;
 
@@ -105,6 +109,7 @@ public class FSM {
 
 	/** Returns whether or not the given event can occur in the current state */
 	public boolean eventCanOccur(String eventName) {
+		logger.info("transitions %s",transitions.toString())
 		return transitions.containsKey(new EventKey(eventName, current));
 	}
 	

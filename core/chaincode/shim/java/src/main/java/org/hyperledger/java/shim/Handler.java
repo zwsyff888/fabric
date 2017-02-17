@@ -757,7 +757,7 @@ public class Handler {
 			// and it does not touch the state machine
 				return;
 		}
-
+		
 		logger.debug(String.format("[%s]Handling ChaincodeMessage of type: %s(state:%s)",
 				shortID(message), message.getType(), fsm.current()));
 
