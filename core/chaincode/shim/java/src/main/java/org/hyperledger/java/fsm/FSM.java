@@ -109,7 +109,6 @@ public class FSM {
 
 	/** Returns whether or not the given event can occur in the current state */
 	public boolean eventCanOccur(String eventName) {
-		logger.info("transitions %s",transitions.toString())
 		return transitions.containsKey(new EventKey(eventName, current));
 	}
 	
@@ -219,6 +218,7 @@ public class FSM {
 		// Build transition map and store sets of all events and states.
 		for (EventDesc event : events) {
 			for (String src : event.src) {
+				logger.debug(String.format("transitions %s %s %s",event.name,src,event.dst));
 				transitions.put(new EventKey(event.name, src), event.dst);
 				allStates.add(src);
 			}

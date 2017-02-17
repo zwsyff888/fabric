@@ -104,7 +104,7 @@ public abstract class ChaincodeBase {
 
 	public ManagedChannel newPeerClientConnection() {
 		NettyChannelBuilder builder = NettyChannelBuilder.forAddress(host, port);
-		logger.info("Inside newPeerCLientConnection");
+		logger.info("Inside newPeerCLientConnection  zws");
 
 		if (tlsEnabled) {
 			logger.info("tls enable");
