@@ -366,8 +366,8 @@ func (chaincodeSupport *ChaincodeSupport) getArgsAndEnv(cccid *ccprovider.CCCont
 	case pb.ChaincodeSpec_JAVA:
 		//TODO add security args
 		args = strings.Split(
-			fmt.Sprintf("java -jar chaincode.jar -a %s -i %s",
-				chaincodeSupport.peerAddress, cccid.Name),
+			fmt.Sprintf("java -jar chaincode.jar -a %s -i %s -v %s",
+				chaincodeSupport.peerAddress, cccid.Name, cccid.Version),
 			" ")
 		if chaincodeSupport.peerTLS {
 			args = append(args, "-s")
