@@ -95,6 +95,7 @@ func Start(cc Chaincode) error {
 	}
 
 	chaincodename := viper.GetString("chaincode.id.name")
+	chaincodeLogger.Debugf("chaincode.id.name %s", chaincodename)
 	if chaincodename == "" {
 		return fmt.Errorf("Error chaincode id not provided")
 	}
@@ -179,7 +180,7 @@ func chatWithPeer(chaincodename string, stream PeerChaincodeStream, cc Chaincode
 
 	// Create the shim handler responsible for all control logic
 	handler := newChaincodeHandler(stream, cc)
-
+	chaincodeLogger.Debugf("chatWithPeer chaincodename %v", chaincodename)
 	defer stream.CloseSend()
 	// Send the ChaincodeID during register.
 	chaincodeID := &pb.ChaincodeID{Name: chaincodename}
