@@ -3,10 +3,12 @@ package node
 import (
 	"encoding/base64"
 	"fmt"
-	// "github.com/golang/protobuf/proto"
+	"github.com/golang/protobuf/proto"
 	"github.com/hyperledger/fabric/common/util"
+	"github.com/hyperledger/fabric/core/ledger/kvledger/txmgmt/rwset"
 	"github.com/hyperledger/fabric/core/ledger/ledgermgmt"
 	"github.com/hyperledger/fabric/core/peer"
+	"github.com/hyperledger/fabric/msp"
 	"github.com/hyperledger/fabric/protos/common"
 	pb "github.com/hyperledger/fabric/protos/peer"
 	"github.com/hyperledger/fabric/protos/utils"
@@ -14,14 +16,26 @@ import (
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
+
 	"log"
 	"net"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 )
 
 type server struct{}
+
+func getChainCodeID(inputs string) string {
+	s := strings.Split(inputs, "\n")
+	cn := strings.Split(s[1], ":")
+
+	chainCodeID := string(cn[0][1:])
+
+	return chainCodeID
+
+}
 
 func getBlockDataByIndex(j int, blocks []*common.Block) *pb.Mblock {
 	blocksheader := blocks[j].GetHeader()
@@ -53,6 +67,7 @@ func getBlockDataByIndex(j int, blocks []*common.Block) *pb.Mblock {
 			fmt.Println("@@@@chenqiao: err", err)
 			continue
 		}
+
 		txid := p.Header.ChannelHeader.TxId
 		tchainID := p.Header.ChannelHeader.ChannelId
 		time := p.Header.ChannelHeader.Timestamp
@@ -61,10 +76,79 @@ func getBlockDataByIndex(j int, blocks []*common.Block) *pb.Mblock {
 		// fmt.Println("@@@@ chenqiao tchainID: ", tchainID)
 		// fmt.Println("@@@@ chenqiao Time: ", time)
 
+		trans := &pb.Transaction{}
+		transerr := proto.Unmarshal(p.Data, trans)
+		if transerr != nil {
+			fmt.Println("ERROR!!!!!")
+			transData := &pb.TransData{
+				Txid:    txid,
+				ChainID: tchainID,
+				Time:    time,
+			}
+			tmpblockData = append(tmpblockData, transData)
+			continue
+		}
+
+		// fmt.Println("@@@@ chenqiao transVersion", trans.Version)
+		// fmt.Println("@@@@ chenqiao Time!", trans.Timestamp)
+
+		cap := &pb.ChaincodeActionPayload{}
+		caperr := proto.Unmarshal(trans.Actions[0].Payload, cap)
+		if caperr != nil {
+			fmt.Println("CAP ERROR!!!!!")
+			continue
+		}
+
+		chainpayload := base64.StdEncoding.EncodeToString(cap.ChaincodeProposalPayload)
+
+		prpayload := &pb.ProposalResponsePayload{}
+		prperr := proto.Unmarshal(cap.Action.ProposalResponsePayload, prpayload)
+		if prperr != nil {
+			fmt.Println("PRP ERROR!!! ")
+			continue
+		}
+
+		ccids := &pb.ChaincodeAction{}
+		ccidserr := proto.Unmarshal(prpayload.Extension, ccids)
+		if ccidserr != nil {
+			fmt.Println("CCIDS ERROR!!! ")
+			continue
+		}
+
+		txRWSet := &rwset.TxReadWriteSet{}
+		txRWSet.Unmarshal(ccids.Results)
+
+		// fmt.Println("HEHEHEHEHEHEHEHE!!!HE!!")
+
+		chainCodeID := getChainCodeID(txRWSet.String())
+
+		che := &pb.ChaincodeHeaderExtension{}
+		cheerr := proto.Unmarshal(p.Header.ChannelHeader.Extension, che)
+		if cheerr != nil {
+			fmt.Println("CHE ERROR!!! ")
+			continue
+		}
+
+		ms := &msp.SerializedIdentity{}
+
+		mserr := proto.Unmarshal(p.Header.SignatureHeader.Creator, ms)
+		if mserr != nil {
+			fmt.Println("MS ERROR!!! ")
+			continue
+		}
+
+		// fmt.Println("TTTTTTTTTT", p.Header.SignatureHeader.Nonce)
+		// fmt.Println("PPPPPPPPPP", e.Signature)
+
 		transData := &pb.TransData{
-			Txid:    txid,
-			ChainID: tchainID,
-			Time:    time,
+			Txid:        txid,
+			ChainID:     tchainID,
+			Time:        time,
+			ChainCodeID: chainCodeID,
+			Payload:     chainpayload,
+			Type:        strconv.Itoa(int(p.Header.ChannelHeader.Type)),
+			Nonce:       base64.StdEncoding.EncodeToString(p.Header.SignatureHeader.Nonce),
+			Signature:   base64.StdEncoding.EncodeToString(e.Signature),
 		}
 		tmpblockData = append(tmpblockData, transData)
 

@@ -162,3 +162,52 @@ func (this *NewController) GetBlockDetail() {
 	// str, _ := req.String()
 	// this.Ctx.WriteString(str)
 }
+
+func (this *NewController) GetTransInfo() {
+	this.Ctx.Output.Header("Access-Control-Allow-Origin", "*")
+	// r := this.Ctx.Input.Param(":splat")
+	// fmt.Println("chenqiao r: ", r)
+	chainid := this.GetString("chainid")
+	tmpNum, err := this.GetInt("startnum")
+	if err != nil || tmpNum < 0 {
+		tmpNum = 0
+	}
+
+	if !models.BaseCheck(chainid) {
+		this.Data["json"] = []string{}
+	} else {
+
+		peerid, _ := models.GetMaxPeer(chainid)
+
+		blockNum := uint64(tmpNum)
+
+		this.Data["json"] = models.GetTransinfo(peerid, blockNum, chainid)
+
+	}
+	this.ServeJSON()
+
+}
+
+func (this *NewController) GetTransDetail() {
+	this.Ctx.Output.Header("Access-Control-Allow-Origin", "*")
+	// peerIP := this.GetString("peerip")
+	// tmpNum, err := this.GetInt("blocknum")
+	txid := this.GetString("txid")
+	chainid := this.GetString("chainid")
+
+	if !models.BaseCheck(chainid) {
+		this.Data["json"] = []string{}
+	} else {
+		peerid, _ := models.GetMaxPeer(chainid)
+
+		// fmt.Println("blocknum ", blockNum)
+		tmp := models.GetTransDetail(peerid, txid, chainid)
+		if tmp != nil {
+			this.Data["json"] = *tmp
+		} else {
+			this.Data["json"] = []string{}
+		}
+
+	}
+	this.ServeJSON()
+}

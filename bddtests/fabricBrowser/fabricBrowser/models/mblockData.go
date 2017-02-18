@@ -13,6 +13,11 @@ type TransData struct {
 	Txid    string
 	ChainID string
 	// Time    int64 //暂时去掉time的获取
+	Type        string
+	ChainCodeID string
+	Payload     string
+	Nonce       string
+	Signature   string
 }
 
 func NewMblockData() *MblockData {
@@ -33,11 +38,11 @@ func (m *MblockData) initMblockData(input *pb.MblockData) {
 		tmp.Txid = input.Datas[i].Txid
 		// fmt.Println("@@@@chenqiao chainid: ", input.Datas[i].ChainID)
 		tmp.ChainID = input.Datas[i].ChainID
-		// if input.Datas[i].Time != nil {
-		// tmp.Time = int64(input.Datas[i].Time.Seconds)
-		// } else {
-		// tmp.Time = 0
-		// }
+		tmp.Payload = input.Datas[i].Payload
+		tmp.ChainCodeID = input.Datas[i].ChainCodeID
+		tmp.Type = input.Datas[i].Type
+		tmp.Nonce = input.Datas[i].Nonce
+		tmp.Signature = input.Datas[i].Signature
 
 		m.Data = append(m.Data, tmp)
 	}

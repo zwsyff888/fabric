@@ -3,6 +3,7 @@ package main
 import (
 	"github.com/astaxie/beego"
 	"github.com/astaxie/beego/logs"
+	// "github.com/beego/i18n"
 	"github.com/hyperledger/fabric/bddtests/fabricBrowser/fabricBrowser/models"
 	_ "github.com/hyperledger/fabric/bddtests/fabricBrowser/fabricBrowser/routers"
 )
@@ -18,6 +19,7 @@ func main() {
 	logs.Debug(models.AllChannelPeerStatusMap)
 
 	beego.SetStaticPath("/super", "static/supervise")
+	// beego.AddFuncMap("i18n", i18n.Tr)
 	beego.Run()
 
 }

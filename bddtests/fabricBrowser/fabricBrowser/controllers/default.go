@@ -24,3 +24,11 @@ func (c *SuperviseController) Get() {
 	fmt.Println("lslsllsls")
 	c.TplName = "supervise.html"
 }
+
+type ZhController struct {
+	beego.Controller
+}
+
+func (c *ZhController) Get() {
+	c.TplName = "index-zh/index.html"
+}

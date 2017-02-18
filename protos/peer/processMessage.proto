@@ -14,10 +14,6 @@ service statusPeer {
     rpc ProcessMessage(ChannelMessage) returns (MessageOutput) {}    
 }
 
-service queryPeer{
-    rpc QueryMessage(QueryBlocks) returns (Mblock){}
-}
-
 message QueryBlocks{
     uint64 BlockIndex = 1;
     string ChannelID = 2;
@@ -52,10 +48,16 @@ message MblockData {
     repeated TransData Datas = 1;
 }
 
+
 message TransData{
     string Txid = 1;
     string ChainID = 2;
     google.protobuf.Timestamp Time = 3;
+    string ChainCodeID = 4;
+    string Payload = 5;
+    string Type = 6;
+    string Nonce = 7;
+    string Signature = 8;
 }
 
 message MblockMetadata {

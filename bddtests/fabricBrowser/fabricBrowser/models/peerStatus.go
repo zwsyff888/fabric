@@ -34,6 +34,20 @@ func BaseCheck(args ...interface{}) bool {
 
 }
 
+func GetTransByTxID(peerid string, txid string, chainid string) *TransData {
+	PeerStatusMap := AllChannelPeerStatusMap[chainid]
+	for blockindex := 0; blockindex < len(PeerStatusMap[peerid].Mblocks); blockindex++ {
+		tmptrans := PeerStatusMap[peerid].Mblocks[blockindex].Data.Data
+		length := len(tmptrans)
+		for i := 0; i < length; i++ {
+			if txid == tmptrans[i].Txid {
+				return tmptrans[i]
+			}
+		}
+	}
+	return nil
+}
+
 func GetPeerTransNumber(id string, blockindex uint64, chainid string) uint64 {
 	ans := uint64(0)
 	PeerStatusMap := AllChannelPeerStatusMap[chainid]

@@ -18,4 +18,11 @@ func init() {
 	// beego.Router("/withblocksinfos/rate", &controllers.NewController{}, "*:GetRate")
 	beego.Router("/withblocksinfos/blockinfo/*", &controllers.NewController{}, "*:GetBlockInfo")
 	beego.Router("/withblocksinfos/blockdetail/*", &controllers.NewController{}, "*:GetBlockDetail")
+
+	beego.Router("/withblocksinfos/transinfo/*", &controllers.NewController{}, "*:GetTransInfo")
+	beego.Router("/withblocksinfos/transdetail/*", &controllers.NewController{}, "*:GetTransDetail")
+
+	beego.Router("/index-zh", &controllers.ZhController{})
+	beego.Router("/ws/test", &controllers.WSController{}, "*:Test")
+
 }
