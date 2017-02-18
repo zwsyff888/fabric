@@ -228,9 +228,10 @@ func newDuplicateChaincodeHandlerError(chaincodeHandler *Handler) error {
 
 func (chaincodeSupport *ChaincodeSupport) registerHandler(chaincodehandler *Handler) error {
 	key := chaincodehandler.ChaincodeID.Name
-	if !strings.ContainsAny(key, ":") {
+	chaincodeLogger.Infof("chaincodehandler.ChaincodeID %v", chaincodehandler.ChaincodeID)
+	/*if !strings.ContainsAny(key, ":") {
 		key = fmt.Sprint(key, ":0")
-	}
+	}*/
 	chaincodeSupport.runningChaincodes.Lock()
 	defer chaincodeSupport.runningChaincodes.Unlock()
 
@@ -330,6 +331,7 @@ func (chaincodeSupport *ChaincodeSupport) sendReady(context context.Context, ccc
 
 //get args and env given chaincodeID
 func (chaincodeSupport *ChaincodeSupport) getArgsAndEnv(cccid *ccprovider.CCContext, cLang pb.ChaincodeSpec_Type) (args []string, envs []string, err error) {
+
 	canName := cccid.GetCanonicalName()
 	envs = []string{"CORE_CHAINCODE_ID_NAME=" + canName}
 
@@ -485,6 +487,7 @@ func (chaincodeSupport *ChaincodeSupport) Stop(context context.Context, cccid *c
 // Launch will launch the chaincode if not running (if running return nil) and will wait for handler of the chaincode to get into FSM ready state.
 func (chaincodeSupport *ChaincodeSupport) Launch(context context.Context, cccid *ccprovider.CCContext, spec interface{}) (*pb.ChaincodeID, *pb.ChaincodeInput, error) {
 	//build the chaincode
+	chaincodeLogger.Infof("launch-zws")
 	var cID *pb.ChaincodeID
 	var cMsg *pb.ChaincodeInput
 	var cLang pb.ChaincodeSpec_Type
