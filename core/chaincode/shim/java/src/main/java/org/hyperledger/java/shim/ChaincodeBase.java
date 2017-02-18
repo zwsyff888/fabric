@@ -179,7 +179,7 @@ public abstract class ChaincodeBase {
 
 		// Send the ChaincodeID during register.
 		ChaincodeID chaincodeID = ChaincodeID.newBuilder()
-				.setName(id)//TODO params.get("chaincode.id.name"))
+				.setName(id+":"+version)//TODO params.get("chaincode.id.name"))
 				.setVersion(version)
 				.build();
 
