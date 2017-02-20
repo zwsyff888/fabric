@@ -228,6 +228,7 @@ func (handler *Handler) handleInit(msg *pb.ChaincodeMessage) {
 		// Create the ChaincodeStub which the chaincode can use to callback
 		stub := new(ChaincodeStub)
 		err := stub.init(handler, msg.Txid, input, msg.Proposal)
+		chaincodeLogger.Infof("handleInit")
 		if err != nil {
 			chaincodeLogger.Errorf("[%s]Init get error response [%s]. Sending %s", shorttxid(msg.Txid), err.Error(), pb.ChaincodeMessage_ERROR)
 			nextStateMsg = &pb.ChaincodeMessage{Type: pb.ChaincodeMessage_ERROR, Payload: []byte(err.Error()), Txid: msg.Txid, ChaincodeEvent: stub.chaincodeEvent}

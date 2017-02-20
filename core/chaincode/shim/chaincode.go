@@ -281,7 +281,6 @@ func (stub *ChaincodeStub) init(handler *Handler, txid string, input *pb.Chainco
 	stub.args = input.Args
 	stub.handler = handler
 	stub.proposal = proposal
-
 	// TODO: sanity check: verify that every call to init with a nil
 	// proposal is a legitimate one, meaning it is an internal call
 	// to system chaincodes.

@@ -173,6 +173,7 @@ func (handler *Handler) serialSend(msg *pb.ChaincodeMessage) error {
 //communication on supplied error channel. A typical use will be a non-blocking or
 //nil channel
 func (handler *Handler) serialSendAsync(msg *pb.ChaincodeMessage, errc chan error) {
+	chaincodeLogger.Infof("serialSendAsync %v", msg)
 	go func() {
 		err := handler.serialSend(msg)
 		if errc != nil {
