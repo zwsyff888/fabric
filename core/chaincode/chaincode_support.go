@@ -640,6 +640,7 @@ func createCCMessage(typ pb.ChaincodeMessage_Type, txid string, cMsg *pb.Chainco
 
 // Execute executes a transaction and waits for it to complete until a timeout value.
 func (chaincodeSupport *ChaincodeSupport) Execute(ctxt context.Context, cccid *ccprovider.CCContext, msg *pb.ChaincodeMessage, timeout time.Duration) (*pb.ChaincodeMessage, error) {
+	chaincodeLogger.Infof("")
 	canName := cccid.GetCanonicalName()
 	chaincodeSupport.runningChaincodes.Lock()
 	//we expect the chaincode to be running... sanity check
