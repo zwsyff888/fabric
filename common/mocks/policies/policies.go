@@ -38,7 +38,33 @@ type Manager struct {
 	// for id is not in PolicyMap
 	Policy *Policy
 
+	// BasePathVal is returned as the result of BasePath
+	BasePathVal string
+
+	// PolicyMap is returned is used to look up Policies in
 	PolicyMap map[string]*Policy
+
+	// SubManagers is used for the return value of Manager
+	SubManagersMap map[string]*Manager
+}
+
+// PolicyNames panics
+func (m *Manager) PolicyNames() []string {
+	panic("Unimplimented")
+}
+
+// BasePath returns BasePathVal
+func (m *Manager) BasePath() string {
+	return m.BasePathVal
+}
+
+// Manager returns the Manager from SubManagers for the last component of the path
+func (m *Manager) Manager(path []string) (policies.Manager, bool) {
+	if len(path) == 0 {
+		return m, true
+	}
+	manager, ok := m.SubManagersMap[path[len(path)-1]]
+	return manager, ok
 }
 
 // GetPolicy returns the value of Manager.Policy and whether it was nil or not

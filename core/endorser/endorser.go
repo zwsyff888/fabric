@@ -23,6 +23,8 @@ import (
 	"github.com/op/go-logging"
 	"golang.org/x/net/context"
 
+	"errors"
+
 	"github.com/hyperledger/fabric/common/util"
 	"github.com/hyperledger/fabric/core/chaincode"
 	"github.com/hyperledger/fabric/core/chaincode/shim"
@@ -271,12 +273,7 @@ func (e *Endorser) endorseProposal(ctx context.Context, chainID string, txid str
 // ProcessProposal process the Proposal
 func (e *Endorser) ProcessProposal(ctx context.Context, signedProp *pb.SignedProposal) (*pb.ProposalResponse, error) {
 	// at first, we check whether the message is valid
-	prop, _, hdrExt, err := validation.ValidateProposalMessage(signedProp)
-	if err != nil {
-		return &pb.ProposalResponse{Response: &pb.Response{Status: 500, Message: err.Error()}}, err
-	}
-
-	hdr, err := putils.GetHeader(prop.Header)
+	prop, hdr, hdrExt, err := validation.ValidateProposalMessage(signedProp)
 	if err != nil {
 		return &pb.ProposalResponse{Response: &pb.Response{Status: 500, Message: err.Error()}}, err
 	}
@@ -290,12 +287,25 @@ func (e *Endorser) ProcessProposal(ctx context.Context, signedProp *pb.SignedPro
 		ischainless = true
 	}
 
-	//TODO check for uniqueness of prop.TxID with ledger
-
+	// Check for uniqueness of prop.TxID with ledger
+	// Notice that ValidateProposalMessage has already verified
+	// that TxID is computed propertly
 	txid := hdr.ChannelHeader.TxId
 	if txid == "" {
-		err = fmt.Errorf("Invalid txID")
+		err = errors.New("Invalid txID. It must be different from the empty string.")
 		return &pb.ProposalResponse{Response: &pb.Response{Status: 500, Message: err.Error()}}, err
+	}
+
+	//chainless proposals do not/cannot affect ledger and cannot be submitted as transactions
+	//ignore uniqueness checks
+	if !ischainless {
+		lgr := peer.GetLedger(chainID)
+		if lgr == nil {
+			return nil, errors.New(fmt.Sprintf("Failure while looking up the ledger %s", chainID))
+		}
+		if _, err := lgr.GetTransactionByID(txid); err == nil {
+			return nil, fmt.Errorf("Duplicate transaction found [%s]. Creator [%x]. [%s]", txid, hdr.SignatureHeader.Creator, err)
+		}
 	}
 
 	// obtaining once the tx simulator for this proposal. This will be nil
@@ -327,8 +337,6 @@ func (e *Endorser) ProcessProposal(ctx context.Context, signedProp *pb.SignedPro
 	//       to validate the supplied action before endorsing it
 
 	//1 -- simulate
-	//TODO what do we do with response ? We need it for Invoke responses for sure
-	//Which field in PayloadResponse will carry return value ?
 	cd, res, simulationResult, ccevent, err := e.simulateProposal(ctx, chainID, txid, prop, hdrExt.ChaincodeId, txsim)
 	if err != nil {
 		return &pb.ProposalResponse{Response: &pb.Response{Status: 500, Message: err.Error()}}, err
@@ -348,7 +356,6 @@ func (e *Endorser) ProcessProposal(ctx context.Context, signedProp *pb.SignedPro
 		}
 	}
 
-	//TODO what do we do with response ? We need it for Invoke responses for sure
 	// Set the proposal response payload - it
 	// contains the "return value" from the
 	// chaincode invocation
@@ -360,7 +367,7 @@ func (e *Endorser) ProcessProposal(ctx context.Context, signedProp *pb.SignedPro
 // Only exposed for testing purposes - commit the tx simulation so that
 // a deploy transaction is persisted and that chaincode can be invoked.
 // This makes the endorser test self-sufficient
-func (e *Endorser) commitTxSimulation(proposal *pb.Proposal, chainID string, signer msp.SigningIdentity, pResp *pb.ProposalResponse) error {
+func (e *Endorser) commitTxSimulation(proposal *pb.Proposal, chainID string, signer msp.SigningIdentity, pResp *pb.ProposalResponse, blockNumber uint64) error {
 	tx, err := putils.CreateSignedTx(proposal, signer, pResp)
 	if err != nil {
 		return err
@@ -375,7 +382,7 @@ func (e *Endorser) commitTxSimulation(proposal *pb.Proposal, chainID string, sig
 	if err != nil {
 		return err
 	}
-	block := common.NewBlock(1, []byte{})
+	block := common.NewBlock(blockNumber, []byte{})
 	block.Data.Data = [][]byte{txBytes}
 	block.Header.DataHash = block.Data.Hash()
 	if err = lgr.Commit(block); err != nil {

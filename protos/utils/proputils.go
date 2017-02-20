@@ -21,7 +21,14 @@ import (
 
 	"errors"
 
+	"encoding/binary"
+
+	"encoding/hex"
+
 	"github.com/golang/protobuf/proto"
+	"github.com/hyperledger/fabric/bccsp"
+	"github.com/hyperledger/fabric/bccsp/factory"
+	"github.com/hyperledger/fabric/core/chaincode/platforms"
 	"github.com/hyperledger/fabric/core/crypto/primitives"
 	"github.com/hyperledger/fabric/protos/common"
 	"github.com/hyperledger/fabric/protos/peer"
@@ -47,32 +54,42 @@ func GetChaincodeInvocationSpec(prop *peer.Proposal) (*peer.ChaincodeInvocationS
 	return cis, nil
 }
 
-// GetChaincodeProposalContext returns a ChaincodeProposalContext from a Proposal
-func GetChaincodeProposalContext(prop *peer.Proposal) (*peer.ChaincodeProposalContext, error) {
-	// get back the header
+// GetChaincodeProposalContext returns creator and transient
+func GetChaincodeProposalContext(prop *peer.Proposal) ([]byte, map[string][]byte, error) {
+	if prop == nil {
+		return nil, nil, fmt.Errorf("Proposal is nil")
+	}
+	if len(prop.Header) == 0 {
+		return nil, nil, fmt.Errorf("Proposal's header is nil")
+	}
+	if len(prop.Payload) == 0 {
+		return nil, nil, fmt.Errorf("Proposal's payload is nil")
+	}
+
+	//// get back the header
 	hdr, err := GetHeader(prop.Header)
 	if err != nil {
-		return nil, fmt.Errorf("Could not extract the header from the proposal: %s", err)
+		return nil, nil, fmt.Errorf("Could not extract the header from the proposal: %s", err)
+	}
+	if hdr == nil {
+		return nil, nil, fmt.Errorf("Unmarshalled header is nil")
 	}
 	if common.HeaderType(hdr.ChannelHeader.Type) != common.HeaderType_ENDORSER_TRANSACTION &&
 		common.HeaderType(hdr.ChannelHeader.Type) != common.HeaderType_CONFIG {
-		return nil, fmt.Errorf("Invalid proposal type expected ENDORSER_TRANSACTION or CONFIG. Was: %d", hdr.ChannelHeader.Type)
+		return nil, nil, fmt.Errorf("Invalid proposal type expected ENDORSER_TRANSACTION or CONFIG. Was: %d", hdr.ChannelHeader.Type)
 	}
 
 	if hdr.SignatureHeader == nil {
-		return nil, errors.New("Invalid signature header. It must be different from nil.")
+		return nil, nil, errors.New("Invalid signature header. It must be different from nil.")
 	}
 
 	ccPropPayload := &peer.ChaincodeProposalPayload{}
 	err = proto.Unmarshal(prop.Payload, ccPropPayload)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	return &peer.ChaincodeProposalContext{
-		Creator:   hdr.SignatureHeader.Creator,
-		Transient: ccPropPayload.Transient,
-	}, nil
+	return hdr.SignatureHeader.Creator, ccPropPayload.TransientMap, nil
 }
 
 // GetHeader Get Header from bytes
@@ -112,6 +129,17 @@ func GetProposalResponse(prBytes []byte) (*peer.ProposalResponse, error) {
 func GetChaincodeDeploymentSpec(code []byte) (*peer.ChaincodeDeploymentSpec, error) {
 	cds := &peer.ChaincodeDeploymentSpec{}
 	err := proto.Unmarshal(code, cds)
+	if err != nil {
+		return nil, err
+	}
+
+	// FAB-2122: Validate the CDS according to platform specific requirements
+	platform, err := platforms.Find(cds.ChaincodeSpec.Type)
+	if err != nil {
+		return nil, err
+	}
+
+	err = platform.ValidateDeploymentSpec(cds)
 	if err != nil {
 		return nil, err
 	}
@@ -241,47 +269,60 @@ func GetSignaturePolicyEnvelope(bytes []byte) (*common.SignaturePolicyEnvelope, 
 }
 
 // CreateChaincodeProposal creates a proposal from given input
-func CreateChaincodeProposal(txid string, typ common.HeaderType, chainID string, cis *peer.ChaincodeInvocationSpec, creator []byte) (*peer.Proposal, error) {
-	return CreateChaincodeProposalWithTransient(txid, typ, chainID, cis, creator, nil)
+func CreateChaincodeProposal(typ common.HeaderType, chainID string, cis *peer.ChaincodeInvocationSpec, creator []byte) (*peer.Proposal, string, error) {
+	return CreateChaincodeProposalWithTransient(typ, chainID, cis, creator, nil)
 }
 
 // CreateChaincodeProposalWithTransient creates a proposal from given input
-func CreateChaincodeProposalWithTransient(txid string, typ common.HeaderType, chainID string, cis *peer.ChaincodeInvocationSpec, creator []byte, transient []byte) (*peer.Proposal, error) {
+func CreateChaincodeProposalWithTransient(typ common.HeaderType, chainID string, cis *peer.ChaincodeInvocationSpec, creator []byte, transientMap map[string][]byte) (*peer.Proposal, string, error) {
 	ccHdrExt := &peer.ChaincodeHeaderExtension{ChaincodeId: cis.ChaincodeSpec.ChaincodeId}
 	ccHdrExtBytes, err := proto.Marshal(ccHdrExt)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 
 	cisBytes, err := proto.Marshal(cis)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 
-	ccPropPayload := &peer.ChaincodeProposalPayload{Input: cisBytes, Transient: transient}
+	ccPropPayload := &peer.ChaincodeProposalPayload{Input: cisBytes, TransientMap: transientMap}
 	ccPropPayloadBytes, err := proto.Marshal(ccPropPayload)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 
 	// generate a random nonce
 	nonce, err := primitives.GetRandomNonce()
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 
-	hdr := &common.Header{ChannelHeader: &common.ChannelHeader{Type: int32(typ),
+	// epoch
+	// TODO: it is now set to zero. This must be changed once we
+	// get a more appropriate mechanism to handle it in.
+	var epoch uint64 = 0
+
+	// compute txid
+	txid, err := ComputeProposalTxID(nonce, creator)
+	if err != nil {
+		return nil, "", err
+	}
+
+	hdr := &common.Header{ChannelHeader: &common.ChannelHeader{
+		Type:      int32(typ),
 		TxId:      txid,
 		ChannelId: chainID,
-		Extension: ccHdrExtBytes},
+		Extension: ccHdrExtBytes,
+		Epoch:     epoch},
 		SignatureHeader: &common.SignatureHeader{Nonce: nonce, Creator: creator}}
 
 	hdrBytes, err := proto.Marshal(hdr)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 
-	return &peer.Proposal{Header: hdrBytes, Payload: ccPropPayloadBytes}, nil
+	return &peer.Proposal{Header: hdrBytes, Payload: ccPropPayloadBytes}, txid, nil
 }
 
 // GetBytesProposalResponsePayload gets proposal response payload
@@ -433,27 +474,27 @@ func GetActionFromEnvelope(envBytes []byte) (*peer.ChaincodeAction, error) {
 }
 
 // CreateProposalFromCIS returns a proposal given a serialized identity and a ChaincodeInvocationSpec
-func CreateProposalFromCIS(txid string, typ common.HeaderType, chainID string, cis *peer.ChaincodeInvocationSpec, creator []byte) (*peer.Proposal, error) {
-	return CreateChaincodeProposal(txid, typ, chainID, cis, creator)
+func CreateProposalFromCIS(typ common.HeaderType, chainID string, cis *peer.ChaincodeInvocationSpec, creator []byte) (*peer.Proposal, string, error) {
+	return CreateChaincodeProposal(typ, chainID, cis, creator)
 }
 
 // CreateInstallProposalFromCDS returns a install proposal given a serialized identity and a ChaincodeDeploymentSpec
-func CreateInstallProposalFromCDS(txid string, cds *peer.ChaincodeDeploymentSpec, creator []byte) (*peer.Proposal, error) {
-	return createProposalFromCDS(txid, "", cds, creator, nil, nil, nil, "install")
+func CreateInstallProposalFromCDS(cds *peer.ChaincodeDeploymentSpec, creator []byte) (*peer.Proposal, string, error) {
+	return createProposalFromCDS("", cds, creator, nil, nil, nil, "install")
 }
 
 // CreateDeployProposalFromCDS returns a deploy proposal given a serialized identity and a ChaincodeDeploymentSpec
-func CreateDeployProposalFromCDS(txid string, chainID string, cds *peer.ChaincodeDeploymentSpec, creator []byte, policy []byte, escc []byte, vscc []byte) (*peer.Proposal, error) {
-	return createProposalFromCDS(txid, chainID, cds, creator, policy, escc, vscc, "deploy")
+func CreateDeployProposalFromCDS(chainID string, cds *peer.ChaincodeDeploymentSpec, creator []byte, policy []byte, escc []byte, vscc []byte) (*peer.Proposal, string, error) {
+	return createProposalFromCDS(chainID, cds, creator, policy, escc, vscc, "deploy")
 }
 
 // CreateUpgradeProposalFromCDS returns a upgrade proposal given a serialized identity and a ChaincodeDeploymentSpec
-func CreateUpgradeProposalFromCDS(txid string, chainID string, cds *peer.ChaincodeDeploymentSpec, creator []byte, policy []byte, escc []byte, vscc []byte) (*peer.Proposal, error) {
-	return createProposalFromCDS(txid, chainID, cds, creator, policy, escc, vscc, "upgrade")
+func CreateUpgradeProposalFromCDS(chainID string, cds *peer.ChaincodeDeploymentSpec, creator []byte, policy []byte, escc []byte, vscc []byte) (*peer.Proposal, string, error) {
+	return createProposalFromCDS(chainID, cds, creator, policy, escc, vscc, "upgrade")
 }
 
 // createProposalFromCDS returns a deploy or upgrade proposal given a serialized identity and a ChaincodeDeploymentSpec
-func createProposalFromCDS(txid string, chainID string, cds *peer.ChaincodeDeploymentSpec, creator []byte, policy []byte, escc []byte, vscc []byte, propType string) (*peer.Proposal, error) {
+func createProposalFromCDS(chainID string, cds *peer.ChaincodeDeploymentSpec, creator []byte, policy []byte, escc []byte, vscc []byte, propType string) (*peer.Proposal, string, error) {
 	//in the new mode, cds will be nil, "deploy" and "upgrade" are instantiates.
 	var ccinp *peer.ChaincodeInput
 	var b []byte
@@ -461,7 +502,7 @@ func createProposalFromCDS(txid string, chainID string, cds *peer.ChaincodeDeplo
 	if cds != nil {
 		b, err = proto.Marshal(cds)
 		if err != nil {
-			return nil, err
+			return nil, "", err
 		}
 	}
 	switch propType {
@@ -481,5 +522,61 @@ func createProposalFromCDS(txid string, chainID string, cds *peer.ChaincodeDeplo
 			Input:       ccinp}}
 
 	//...and get the proposal for it
-	return CreateProposalFromCIS(txid, common.HeaderType_ENDORSER_TRANSACTION, chainID, lcccSpec, creator)
+	return CreateProposalFromCIS(common.HeaderType_ENDORSER_TRANSACTION, chainID, lcccSpec, creator)
+}
+
+func ComputeProposalTxID(nonce, creator []byte) (string, error) {
+	// TODO: Get the Hash function to be used from
+	// channel configuration
+	digest, err := factory.GetDefault().Hash(
+		append(nonce, creator...),
+		&bccsp.SHA256Opts{})
+	if err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(digest), nil
+}
+
+func CheckProposalTxID(txid string, nonce, creator []byte) error {
+	computedTxID, err := ComputeProposalTxID(nonce, creator)
+	if err != nil {
+		return fmt.Errorf("Failed computing target TXID for comparison [%s]", err)
+	}
+
+	if txid != computedTxID {
+		return fmt.Errorf("Transaction is not valid. Got [%s], expected [%s]", txid, computedTxID)
+	}
+
+	return nil
+}
+
+// ComputeProposalBinding computes the binding of a proposal
+func ComputeProposalBinding(proposal *peer.Proposal) ([]byte, error) {
+	if proposal == nil {
+		return nil, fmt.Errorf("Porposal is nil")
+	}
+	if len(proposal.Header) == 0 {
+		return nil, fmt.Errorf("Proposal's Header is nil")
+	}
+
+	h, err := GetHeader(proposal.Header)
+	if err != nil {
+		return nil, err
+	}
+
+	return computeProposalBindingInternal(h.SignatureHeader.Nonce, h.SignatureHeader.Creator, h.ChannelHeader.Epoch)
+}
+
+func computeProposalBindingInternal(nonce, creator []byte, epoch uint64) ([]byte, error) {
+	epochBytes := make([]byte, 8)
+	binary.LittleEndian.PutUint64(epochBytes, epoch)
+
+	// TODO: add to genesis block the hash function used for the binding computation.
+	digest, err := factory.GetDefault().Hash(
+		append(append(nonce, creator...), epochBytes...),
+		&bccsp.SHA256Opts{})
+	if err != nil {
+		return nil, err
+	}
+	return digest, nil
 }

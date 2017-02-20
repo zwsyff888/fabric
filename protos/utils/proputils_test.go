@@ -25,6 +25,9 @@ import (
 	"fmt"
 	"os"
 
+	"crypto/sha256"
+	"encoding/hex"
+
 	"github.com/hyperledger/fabric/common/util"
 	"github.com/hyperledger/fabric/msp"
 	mspmgmt "github.com/hyperledger/fabric/msp/mgmt"
@@ -43,9 +46,12 @@ func createCIS() *pb.ChaincodeInvocationSpec {
 }
 
 func TestProposal(t *testing.T) {
-	uuid := util.GenerateUUID()
 	// create a proposal from a ChaincodeInvocationSpec
-	prop, err := CreateChaincodeProposalWithTransient(uuid, common.HeaderType_ENDORSER_TRANSACTION, util.GetTestChainID(), createCIS(), []byte("creator"), []byte("transient"))
+	prop, _, err := CreateChaincodeProposalWithTransient(
+		common.HeaderType_ENDORSER_TRANSACTION,
+		util.GetTestChainID(), createCIS(),
+		[]byte("creator"),
+		map[string][]byte{"certx": []byte("transient")})
 	if err != nil {
 		t.Fatalf("Could not create chaincode proposal, err %s\n", err)
 		return
@@ -123,16 +129,17 @@ func TestProposal(t *testing.T) {
 		return
 	}
 
-	porposalContexd, err := GetChaincodeProposalContext(prop)
+	creator, transient, err := GetChaincodeProposalContext(prop)
 	if err != nil {
 		t.Fatalf("Failed getting chaincode proposal context [%s]", err)
 	}
-	if string(porposalContexd.Transient) != "transient" {
-		t.Fatalf("Failed checking Transient field. Invalid value, expectext 'transient', got [%s]", string(porposalContexd.Transient))
+	if string(creator) != "creator" {
+		t.Fatalf("Failed checking Creator field. Invalid value, expectext 'creator', got [%s]", string(creator))
 		return
 	}
-	if string(porposalContexd.Creator) != "creator" {
-		t.Fatalf("Failed checking Creator field. Invalid value, expectext 'creator', got [%s]", string(porposalContexd.Creator))
+	value, ok := transient["certx"]
+	if !ok || string(value) != "transient" {
+		t.Fatalf("Failed checking Transient field. Invalid value, expectext 'transient', got [%s]", string(value))
 		return
 	}
 }
@@ -224,8 +231,7 @@ func TestProposalResponse(t *testing.T) {
 
 func TestEnvelope(t *testing.T) {
 	// create a proposal from a ChaincodeInvocationSpec
-	uuid := util.GenerateUUID()
-	prop, err := CreateChaincodeProposal(uuid, common.HeaderType_ENDORSER_TRANSACTION, util.GetTestChainID(), createCIS(), signerSerialized)
+	prop, _, err := CreateChaincodeProposal(common.HeaderType_ENDORSER_TRANSACTION, util.GetTestChainID(), createCIS(), signerSerialized)
 	if err != nil {
 		t.Fatalf("Could not create chaincode proposal, err %s\n", err)
 		return
@@ -333,6 +339,40 @@ func TestEnvelope(t *testing.T) {
 		t.Fatalf("results don't match")
 		return
 	}
+}
+
+func TestProposalTxID(t *testing.T) {
+	nonce := []byte{1}
+	creator := []byte{2}
+
+	txid, err := ComputeProposalTxID(nonce, creator)
+	assert.NotEmpty(t, txid, "TxID cannot be empty.")
+	assert.NoError(t, err, "Failed computing txID")
+	assert.Nil(t, CheckProposalTxID(txid, nonce, creator))
+	assert.Error(t, CheckProposalTxID("", nonce, creator))
+
+	txid, err = ComputeProposalTxID(nil, nil)
+	assert.NotEmpty(t, txid, "TxID cannot be empty.")
+	assert.NoError(t, err, "Failed computing txID")
+}
+
+func TestComputeProposalTxID(t *testing.T) {
+	txid, err := ComputeProposalTxID([]byte{1}, []byte{1})
+	assert.NoError(t, err, "Failed computing TxID")
+
+	// Compute the function computed by ComputeProposalTxID,
+	// namely, base64(sha256(nonce||creator))
+	hf := sha256.New()
+	hf.Write([]byte{1})
+	hf.Write([]byte{1})
+	hashOut := hf.Sum(nil)
+	txid2 := hex.EncodeToString(hashOut)
+
+	t.Logf("% x\n", hashOut)
+	t.Logf("% s\n", txid)
+	t.Logf("% s\n", txid2)
+
+	assert.Equal(t, txid, txid2)
 }
 
 var signer msp.SigningIdentity

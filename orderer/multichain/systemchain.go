@@ -18,8 +18,9 @@ package multichain
 
 import (
 	"github.com/hyperledger/fabric/common/configtx"
-	configtxapi "github.com/hyperledger/fabric/common/configtx/api"
-	configtxorderer "github.com/hyperledger/fabric/common/configtx/handlers/orderer"
+	configvaluesapi "github.com/hyperledger/fabric/common/configvalues"
+	configvalueschannel "github.com/hyperledger/fabric/common/configvalues/channel"
+	configtxorderer "github.com/hyperledger/fabric/common/configvalues/channel/orderer"
 	"github.com/hyperledger/fabric/common/policies"
 	"github.com/hyperledger/fabric/orderer/common/filter"
 	cb "github.com/hyperledger/fabric/protos/common"
@@ -38,9 +39,11 @@ type chainCreator interface {
 type limitedSupport interface {
 	ChainID() string
 	PolicyManager() policies.Manager
-	SharedConfig() configtxapi.OrdererConfig
-	ChannelConfig() configtxapi.ChannelConfig
+	SharedConfig() configvaluesapi.Orderer
+	ChannelConfig() configvalueschannel.ConfigReader
 	Enqueue(env *cb.Envelope) bool
+	NewSignatureHeader() (*cb.SignatureHeader, error)
+	Sign([]byte) ([]byte, error)
 }
 
 type systemChainCommitter struct {
@@ -105,7 +108,65 @@ func newSystemChain(support limitedSupport) *systemChain {
 	}
 }
 
-func (sc *systemChain) proposeChain(configTx *cb.Envelope) cb.Status {
+// proposeChain takes in an envelope of type CONFIG_UPDATE, generates the new CONFIG and passes it along to the orderer system channel
+func (sc *systemChain) proposeChain(configUpdateTx *cb.Envelope) cb.Status {
+	configUpdatePayload, err := utils.UnmarshalPayload(configUpdateTx.Payload)
+	if err != nil {
+		logger.Debugf("Failing to propose channel creation because of payload unmarshaling error: %s", err)
+		return cb.Status_BAD_REQUEST
+	}
+
+	configUpdateEnv, err := configtx.UnmarshalConfigUpdateEnvelope(configUpdatePayload.Data)
+	if err != nil {
+		logger.Debugf("Failing to propose channel creation because of config update envelope unmarshaling error: %s", err)
+		return cb.Status_BAD_REQUEST
+	}
+
+	configUpdate, err := configtx.UnmarshalConfigUpdate(configUpdateEnv.ConfigUpdate)
+	if err != nil {
+		logger.Debugf("Failing to propose channel creation because of config update unmarshaling error: %s", err)
+		return cb.Status_BAD_REQUEST
+	}
+
+	if configUpdate.Header == nil {
+		logger.Debugf("Failing to propose channel creation because of config update had no header")
+		return cb.Status_BAD_REQUEST
+	}
+
+	sigHeader, err := sc.support.NewSignatureHeader()
+	if err != nil {
+		logger.Errorf("Error generating signature header: %s", err)
+		return cb.Status_INTERNAL_SERVER_ERROR
+	}
+
+	configTx := &cb.Envelope{
+		Payload: utils.MarshalOrPanic(&cb.Payload{
+			Header: &cb.Header{
+				ChannelHeader: &cb.ChannelHeader{
+					ChannelId: configUpdate.Header.ChannelId,
+					Type:      int32(cb.HeaderType_CONFIG),
+				},
+				SignatureHeader: sigHeader,
+			},
+			Data: utils.MarshalOrPanic(&cb.ConfigEnvelope{
+				Config: &cb.Config{
+					Header: &cb.ChannelHeader{
+						ChannelId: configUpdate.Header.ChannelId,
+						Type:      int32(cb.HeaderType_CONFIG),
+					},
+					Channel: configUpdate.WriteSet,
+				},
+				LastUpdate: configUpdateTx,
+			}),
+		}),
+	}
+
+	configTx.Signature, err = sc.support.Sign(configTx.Payload)
+	if err != nil {
+		logger.Errorf("Error generating signature: %s", err)
+		return cb.Status_INTERNAL_SERVER_ERROR
+	}
+
 	status := sc.authorizeAndInspect(configTx)
 	if status != cb.Status_SUCCESS {
 		return status
@@ -168,13 +229,18 @@ func (sc *systemChain) authorize(configEnvelope *cb.ConfigEnvelope) cb.Status {
 		return cb.Status_BAD_REQUEST
 	}
 
-	configNext, err := configtx.UnmarshalConfigUpdate(configUpdateEnv.ConfigUpdate)
+	config, err := configtx.UnmarshalConfigUpdate(configUpdateEnv.ConfigUpdate)
 	if err != nil {
 		logger.Debugf("Failing to validate chain creation because of unmarshaling error: %s", err)
 		return cb.Status_BAD_REQUEST
 	}
 
-	ordererGroup, ok := configNext.WriteSet.Groups[configtxorderer.GroupKey]
+	if config.WriteSet == nil {
+		logger.Debugf("Failing to validate channel creation because WriteSet is nil")
+		return cb.Status_BAD_REQUEST
+	}
+
+	ordererGroup, ok := config.WriteSet.Groups[configtxorderer.GroupKey]
 	if !ok {
 		logger.Debugf("Rejecting channel creation because it is missing orderer group")
 		return cb.Status_BAD_REQUEST
@@ -243,7 +309,7 @@ func (sc *systemChain) authorizeAndInspect(configTx *cb.Envelope) cb.Status {
 	}
 
 	if payload.Header == nil || payload.Header.ChannelHeader == nil || payload.Header.ChannelHeader.Type != int32(cb.HeaderType_CONFIG) {
-		logger.Debugf("Rejecting chain proposal: Not a config transaction: %s", err)
+		logger.Debugf("Rejecting chain proposal: Not a config transaction")
 		return cb.Status_BAD_REQUEST
 	}
 

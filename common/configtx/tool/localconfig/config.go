@@ -29,27 +29,66 @@ import (
 	"github.com/spf13/viper"
 )
 
-var logger = logging.MustGetLogger("configtx/tool/localconfig")
+const (
+	// SampleInsecureProfile references the sample profile which does not include any MSPs and uses solo for consensus
+	SampleInsecureProfile = "SampleInsecureSolo"
 
-func init() {
-	logging.SetLevel(logging.ERROR, "")
-}
+	// SampleSingleMSPSoloProfile references the sample profile which includes only the sample MSP and uses solo for consensus
+	SampleSingleMSPSoloProfile = "SampleSingleMSPSolo"
+)
+
+var logger = logging.MustGetLogger("configtx/tool/localconfig")
 
 // Prefix is the default config prefix for the orderer
 const Prefix string = "CONFIGTX"
 
 // TopLevel contains the genesis structures for use by the provisional bootstrapper
 type TopLevel struct {
-	Orderer Orderer
+	Profiles      map[string]*Profile
+	Organizations []*Organization
+	Application   *Application
+	Orderer       *Orderer
+}
+
+// TopLevel contains the genesis structures for use by the provisional bootstrapper
+type Profile struct {
+	Application *Application
+	Orderer     *Orderer
+}
+
+// Application encodes the configuration needed for the config transaction
+type Application struct {
+	Organizations []*Organization
+}
+
+type Organization struct {
+	Name   string
+	ID     string
+	MSPDir string
+
+	// Note, the viper deserialization does not seem to care for
+	// embedding of types, so we use one organization structure for
+	// both orderers and applications
+	AnchorPeers []*AnchorPeer
+}
+
+type AnchorPeer struct {
+	Host string
+	Port int
+}
+
+type ApplicationOrganization struct {
+	Organization
 }
 
 // Orderer contains config which is used for orderer genesis by the provisional bootstrapper
 type Orderer struct {
-	OrdererType  string
-	Addresses    []string
-	BatchTimeout time.Duration
-	BatchSize    BatchSize
-	Kafka        Kafka
+	OrdererType   string
+	Addresses     []string
+	BatchTimeout  time.Duration
+	BatchSize     BatchSize
+	Kafka         Kafka
+	Organizations []*Organization
 }
 
 // BatchSize contains configuration affecting the size of batches
@@ -65,7 +104,7 @@ type Kafka struct {
 }
 
 var genesisDefaults = TopLevel{
-	Orderer: Orderer{
+	Orderer: &Orderer{
 		OrdererType:  "solo",
 		Addresses:    []string{"127.0.0.1:7050"},
 		BatchTimeout: 10 * time.Second,
@@ -80,7 +119,7 @@ var genesisDefaults = TopLevel{
 	},
 }
 
-func (g *TopLevel) completeInitialization() {
+func (g *Profile) completeInitialization() {
 	for {
 		switch {
 		case g.Orderer.OrdererType == "":
@@ -89,9 +128,6 @@ func (g *TopLevel) completeInitialization() {
 		case g.Orderer.Addresses == nil:
 			logger.Infof("Orderer.Addresses unset, setting to %s", genesisDefaults.Orderer.Addresses)
 			g.Orderer.Addresses = genesisDefaults.Orderer.Addresses
-		case g.Orderer.BatchTimeout == 0:
-			logger.Infof("Orderer.BatchTimeout unset, setting to %s", genesisDefaults.Orderer.BatchTimeout)
-			g.Orderer.BatchTimeout = genesisDefaults.Orderer.BatchTimeout
 		case g.Orderer.BatchTimeout == 0:
 			logger.Infof("Orderer.BatchTimeout unset, setting to %s", genesisDefaults.Orderer.BatchTimeout)
 			g.Orderer.BatchTimeout = genesisDefaults.Orderer.BatchTimeout
@@ -113,10 +149,10 @@ func (g *TopLevel) completeInitialization() {
 	}
 }
 
-func Load() *TopLevel {
+func Load(profile string) *Profile {
 	config := viper.New()
 
-	config.SetConfigName("genesis")
+	config.SetConfigName("configtx")
 	var cfgPath string
 
 	// Path to look for the config file in based on GOPATH
@@ -130,8 +166,8 @@ func Load() *TopLevel {
 	}
 
 	for _, genesisPath := range searchPath {
-		logger.Infof("Checking for genesis.yaml at: %s", genesisPath)
-		if _, err := os.Stat(filepath.Join(genesisPath, "genesis.yaml")); err != nil {
+		logger.Infof("Checking for configtx.yaml at: %s", genesisPath)
+		if _, err := os.Stat(filepath.Join(genesisPath, "configtx.yaml")); err != nil {
 			// The yaml file does not exist in this component of the path
 			continue
 		}
@@ -139,14 +175,15 @@ func Load() *TopLevel {
 	}
 
 	if cfgPath == "" {
-		logger.Fatalf("Could not find genesis.yaml in paths of %s.  Try setting ORDERER_CFG_PATH, PEER_CFG_PATH, or GOPATH correctly", searchPath)
+		logger.Fatalf("Could not find configtx.yaml in paths of %s.  Try setting ORDERER_CFG_PATH, PEER_CFG_PATH, or GOPATH correctly", searchPath)
 	}
 	config.AddConfigPath(cfgPath) // Path to look for the config file in
 
 	// for environment variables
 	config.SetEnvPrefix(Prefix)
 	config.AutomaticEnv()
-	replacer := strings.NewReplacer(".", "_")
+	// This replacer allows substitution within the particular profile without having to fully qualify the name
+	replacer := strings.NewReplacer(strings.ToUpper(fmt.Sprintf("profiles.%s.", profile)), "", ".", "_")
 	config.SetEnvKeyReplacer(replacer)
 
 	err := config.ReadInConfig()
@@ -161,7 +198,12 @@ func Load() *TopLevel {
 		panic(fmt.Errorf("Error unmarshaling into structure: %s", err))
 	}
 
-	uconf.completeInitialization()
+	result, ok := uconf.Profiles[profile]
+	if !ok {
+		logger.Panicf("Could not find profile %s", profile)
+	}
 
-	return &uconf
+	result.completeInitialization()
+
+	return result
 }
