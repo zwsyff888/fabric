@@ -59,7 +59,7 @@ func Execute(ctxt context.Context, cccid *ccprovider.CCContext, spec interface{}
 	}
 
 	// TODO: Need to comment next line and uncomment call to getTimeout, when transaction blocks are being created
-	timeout := time.Duration(300000) * time.Millisecond
+	timeout := time.Duration(30000) * time.Millisecond
 
 	if err != nil {
 		return nil, nil, fmt.Errorf("Failed to retrieve chaincode spec(%s)", err)

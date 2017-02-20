@@ -69,7 +69,6 @@ JAVASHIM_DEPS =  $(shell git ls-files core/chaincode/shim/java)
 PROTOS = $(shell git ls-files *.proto | grep -v vendor)
 MSP_SAMPLECONFIG = $(shell git ls-files msp/sampleconfig/*.pem)
 PROJECT_FILES = $(shell git ls-files)
-@echo $(PROJECT_FILES)
 IMAGES = peer orderer ccenv javaenv buildenv #testenv zookeeper kafka couchdb
 
 pkgmap.configtxgen    := $(PKGNAME)/common/configtx/tool/configtxgen
@@ -145,7 +144,7 @@ linter: buildenv
 
 # We (re)build a package within a docker context but persist the $GOPATH/pkg
 # directory so that subsequent builds are faster
-build/docker/bin/%: $(PROJECT_FILES)
+build/docker/bin/%: #$(PROJECT_FILES)
 	$(eval TARGET = ${patsubst build/docker/bin/%,%,${@}})
 	@echo "Building $@"
 	@mkdir -p build/docker/bin build/docker/$(TARGET)/pkg

@@ -75,10 +75,10 @@ public abstract class ChaincodeBase {
 			}
 			if (cl.hasOption('s')) {
 				tlsEnabled = true;
-				logger.debug("TLS enabled");
+				logger.info("TLS enabled");
 				if (cl.hasOption('o')){
 					hostOverrideAuthority = cl.getOptionValue('o');
-					logger.debug("server host override given " + hostOverrideAuthority);
+					logger.info("server host override given " + hostOverrideAuthority);
 				}
 			}
 			if (cl.hasOption('i')) {
@@ -140,7 +140,7 @@ public abstract class ChaincodeBase {
 						@Override
 						public void onNext(ChaincodeMessage message) {
 							try {
-								logger.debug(String.format("[%s]Received message %s from org.hyperledger.java.shim",
+								logger.info(String.format("[%s]Received message %s from org.hyperledger.java.shim",
 										Handler.shortID(message.getTxid()), message.getType()));
 								handler.handleMessage(message);
 							} catch (Exception e) {
@@ -152,7 +152,7 @@ public abstract class ChaincodeBase {
 								//									return
 								//								} else if (in == nil) {
 								//									err = fmt.Errorf("Received nil message, ending chaincode stream")
-								//											logger.debug("Received nil message, ending chaincode stream")
+								//											logger.info("Received nil message, ending chaincode stream")
 								//											return
 							}
 						}
@@ -189,7 +189,7 @@ public abstract class ChaincodeBase {
 				.build();
 
 		// Register on the stream
-		logger.debug(String.format("Registering as '%s' ... sending %s", id, Type.REGISTER));
+		logger.info(String.format("Registering as '%s' ... sending %s", id, Type.REGISTER));
 		handler.serialSend(payload);
 
 		while (true) {
@@ -200,9 +200,9 @@ public abstract class ChaincodeBase {
 				//keepalive messages are PONGs to the fabric's PINGs
 				if (nsInfo.sendToCC || message.getType() == Type.KEEPALIVE) {
 					if (message.getType() == Type.KEEPALIVE){
-						logger.debug("Sending KEEPALIVE response");
+						logger.info("Sending KEEPALIVE response");
 					}else {
-						logger.debug("[" + Handler.shortID(message.getTxid()) + "]Send state message " + message.getType());
+						logger.info("[" + Handler.shortID(message.getTxid()) + "]Send state message " + message.getType());
 					}
 					handler.serialSend(message);
 				}
