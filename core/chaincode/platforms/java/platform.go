@@ -87,6 +87,11 @@ func (javaPlatform *Platform) ValidateSpec(spec *pb.ChaincodeSpec) error {
 	return nil
 }
 
+func (javaPlatform *Platform) ValidateDeploymentSpec(cds *pb.ChaincodeDeploymentSpec) error {
+	// FIXME: Java platform needs to implement its own validation similar to GOLANG
+	return nil
+}
+
 // WritePackage writes the java chaincode package
 func (javaPlatform *Platform) GetDeploymentPayload(spec *pb.ChaincodeSpec) ([]byte, error) {
 
@@ -123,6 +128,7 @@ func (javaPlatform *Platform) GenerateDockerfile(cds *pb.ChaincodeDeploymentSpec
 	var buf []string
 
 	buildCmd, err := getBuildCmd(cds.CodePackage)
+	logger.Infof("buildCmd %v", buildCmd)
 	if err != nil {
 		return "", err
 	}
@@ -134,7 +140,7 @@ func (javaPlatform *Platform) GenerateDockerfile(cds *pb.ChaincodeDeploymentSpec
 	buf = append(buf, "RUN  cp /root/chaincode/src/build/libs/* /root/libs")
 
 	dockerFileContents := strings.Join(buf, "\n")
-
+	logger.Infof("dockerFileContents %v", dockerFileContents)
 	return dockerFileContents, nil
 }
 

@@ -40,6 +40,7 @@ import (
 // the given platform
 type Platform interface {
 	ValidateSpec(spec *pb.ChaincodeSpec) error
+	ValidateDeploymentSpec(spec *pb.ChaincodeDeploymentSpec) error
 	GetDeploymentPayload(spec *pb.ChaincodeSpec) ([]byte, error)
 	GenerateDockerfile(spec *pb.ChaincodeDeploymentSpec) (string, error)
 	GenerateDockerBuild(spec *pb.ChaincodeDeploymentSpec, tw *tar.Writer) error
@@ -49,7 +50,7 @@ var logger = logging.MustGetLogger("chaincode-platform")
 
 // Find returns the platform interface for the given platform type
 func Find(chaincodeType pb.ChaincodeSpec_Type) (Platform, error) {
-
+	logger.Infof("find %v", chaincodeType)
 	switch chaincodeType {
 	case pb.ChaincodeSpec_GOLANG:
 		return &golang.Platform{}, nil

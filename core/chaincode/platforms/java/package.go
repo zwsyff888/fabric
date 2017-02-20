@@ -27,12 +27,15 @@ import (
 
 	cutil "github.com/hyperledger/fabric/core/container/util"
 	pb "github.com/hyperledger/fabric/protos/peer"
+	logging "github.com/op/go-logging"
 )
+
+var logger = logging.MustGetLogger("chaincode-platform")
 
 //tw is expected to have the chaincode in it from GenerateHashcode.
 //This method will just package the dockerfile
 func writeChaincodePackage(spec *pb.ChaincodeSpec, tw *tar.Writer) error {
-
+	logger.Infof("writeChaincodePackage %v", spec)
 	var urlLocation string
 	var err error
 

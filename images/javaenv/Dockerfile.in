@@ -1,4 +1,5 @@
 FROM hyperledger/fabric-baseimage:_BASE_TAG_
+#FROM hyperledger/fabric-javaenv:latest
 RUN curl -fsSL http://192.168.100.119:9000/software/gradle-2.12-bin.zip > /tmp/gradle-2.12-bin.zip
 RUN unzip -qo /tmp/gradle-2.12-bin.zip -d /opt && rm /tmp/gradle-2.12-bin.zip
 RUN ln -s /opt/gradle-2.12/bin/gradle /usr/bin

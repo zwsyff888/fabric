@@ -21,46 +21,35 @@ import (
 	"testing"
 
 	"github.com/hyperledger/fabric/common/configtx"
-	configtxapi "github.com/hyperledger/fabric/common/configtx/api"
 	"github.com/hyperledger/fabric/common/configtx/tool/provisional"
-	mockconfigtxchannel "github.com/hyperledger/fabric/common/mocks/configtx/handlers/channel"
-	mockconfigtxorderer "github.com/hyperledger/fabric/common/mocks/configtx/handlers/orderer"
+	configvaluesapi "github.com/hyperledger/fabric/common/configvalues"
+	configvalueschannel "github.com/hyperledger/fabric/common/configvalues/channel"
+	mockconfigvalueschannel "github.com/hyperledger/fabric/common/mocks/configvalues/channel"
+	mockconfigvaluesorderer "github.com/hyperledger/fabric/common/mocks/configvalues/channel/orderer"
+	mockcrypto "github.com/hyperledger/fabric/common/mocks/crypto"
+	mockpolicies "github.com/hyperledger/fabric/common/mocks/policies"
 	"github.com/hyperledger/fabric/common/policies"
 	"github.com/hyperledger/fabric/orderer/common/filter"
 	cb "github.com/hyperledger/fabric/protos/common"
 	"github.com/hyperledger/fabric/protos/utils"
 )
 
-type mockPolicy struct {
-	err error
-}
-
-func (mp *mockPolicy) Evaluate(sd []*cb.SignedData) error {
-	return mp.err
-}
-
-type mockPolicyManager struct {
-	mp *mockPolicy
-}
-
-func (mpm *mockPolicyManager) GetPolicy(id string) (policies.Policy, bool) {
-	return mpm.mp, mpm.mp != nil
-}
-
 type mockSupport struct {
-	mpm         *mockPolicyManager
-	msc         *mockconfigtxorderer.SharedConfig
+	*mockcrypto.LocalSigner
+	mpm         *mockpolicies.Manager
+	msc         *mockconfigvaluesorderer.SharedConfig
 	chainID     string
 	queue       []*cb.Envelope
-	chainConfig *mockconfigtxchannel.SharedConfig
+	chainConfig *mockconfigvalueschannel.SharedConfig
 }
 
 func newMockSupport(chainID string) *mockSupport {
 	return &mockSupport{
-		mpm:         &mockPolicyManager{},
-		msc:         &mockconfigtxorderer.SharedConfig{},
+		LocalSigner: mockcrypto.FakeLocalSigner,
+		mpm:         &mockpolicies.Manager{},
+		msc:         &mockconfigvaluesorderer.SharedConfig{},
 		chainID:     chainID,
-		chainConfig: &mockconfigtxchannel.SharedConfig{},
+		chainConfig: &mockconfigvalueschannel.SharedConfig{},
 	}
 }
 
@@ -77,11 +66,11 @@ func (ms *mockSupport) PolicyManager() policies.Manager {
 	return ms.mpm
 }
 
-func (ms *mockSupport) SharedConfig() configtxapi.OrdererConfig {
+func (ms *mockSupport) SharedConfig() configvaluesapi.Orderer {
 	return ms.msc
 }
 
-func (ms *mockSupport) ChannelConfig() configtxapi.ChannelConfig {
+func (ms *mockSupport) ChannelConfig() configvalueschannel.ConfigReader {
 	return ms.chainConfig
 }
 
@@ -112,7 +101,7 @@ func TestGoodProposal(t *testing.T) {
 
 	mcc := newMockChainCreator()
 	mcc.ms.msc.ChainCreationPolicyNamesVal = []string{provisional.AcceptAllPolicyKey}
-	mcc.ms.mpm.mp = &mockPolicy{}
+	mcc.ms.mpm.Policy = &mockpolicies.Policy{}
 
 	configEnv, err := configtx.NewChainCreationTemplate(provisional.AcceptAllPolicyKey, configtx.NewCompositeTemplate()).Envelope(newChainID)
 	if err != nil {
@@ -135,8 +124,12 @@ func TestGoodProposal(t *testing.T) {
 	if payload.Header.ChannelHeader.Type != int32(cb.HeaderType_ORDERER_TRANSACTION) {
 		t.Fatalf("Wrapped transaction should be of type ORDERER_TRANSACTION")
 	}
-	envelope := utils.UnmarshalEnvelopeOrPanic(payload.Data)
-	if !reflect.DeepEqual(envelope, ingressTx) {
+	outConfigEnv, err := configtx.UnmarshalConfigEnvelope(utils.UnmarshalPayloadOrPanic(utils.UnmarshalEnvelopeOrPanic(payload.Data).Payload).Data)
+	if err != nil {
+		t.Fatalf("Error unmarshaling: %s", err)
+	}
+
+	if !reflect.DeepEqual(outConfigEnv.LastUpdate, ingressTx) {
 		t.Fatalf("Received different configtx than ingressed into the system")
 	}
 
@@ -156,7 +149,9 @@ func TestGoodProposal(t *testing.T) {
 		t.Fatalf("Proposal should only have created 1 new chain")
 	}
 
-	if !reflect.DeepEqual(mcc.newChains[0], ingressTx) {
+	outConfigEnv, err = configtx.UnmarshalConfigEnvelope(utils.UnmarshalPayloadOrPanic(mcc.newChains[0].Payload).Data)
+
+	if !reflect.DeepEqual(ingressTx, outConfigEnv.LastUpdate) {
 		t.Fatalf("New chain should have been created with ingressTx")
 	}
 }
@@ -165,7 +160,7 @@ func TestProposalWithBadPolicy(t *testing.T) {
 	newChainID := "NewChainID"
 
 	mcc := newMockChainCreator()
-	mcc.ms.mpm.mp = &mockPolicy{}
+	mcc.ms.mpm.Policy = &mockpolicies.Policy{}
 
 	configEnv, err := configtx.NewChainCreationTemplate(provisional.AcceptAllPolicyKey, configtx.NewCompositeTemplate()).Envelope(newChainID)
 	if err != nil {
