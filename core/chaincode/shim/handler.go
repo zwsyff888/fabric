@@ -848,6 +848,7 @@ func (handler *Handler) handleMessage(msg *pb.ChaincodeMessage) error {
 		return err
 	}
 	err := handler.FSM.Event(msg.Type.String(), msg)
+	chaincodeLogger.Infof("handleMessage Event %v %v %v", msg.Type.String(), msg, err)
 	return filterError(err)
 }
 

@@ -187,6 +187,7 @@ public class FSM {
 	 * @throws AsyncException */
 	public void callCallbacks(Event event, CallbackType type) throws CancelledException, AsyncException {
 		String trigger = event.name;
+		logger.info(String.format("callCallbacks %s , %s",trigger, type.toString()));
 		if (type == CallbackType.LEAVE_STATE) trigger = event.src;
 		else if (type == CallbackType.ENTER_STATE) trigger = event.dst;
 		
