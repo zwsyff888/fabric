@@ -142,6 +142,7 @@ public class FSM {
 		if (transition != null) throw new InTrasistionException(eventName);
 
 		String dst = transitions.get(new EventKey(eventName, current));
+		logger.info("TRANSACTION EVENT %s , %s , %s",eventName,current,dst);
 		if (dst == null) {
 			for (EventKey key : transitions.keySet()) {
 				if (key.event.equals(eventName)) {
@@ -219,7 +220,7 @@ public class FSM {
 		// Build transition map and store sets of all events and states.
 		for (EventDesc event : events) {
 			for (String src : event.src) {
-				logger.debug(String.format("transitions %s %s %s",event.name,src,event.dst));
+				logger.info(String.format("transitions %s %s %s",event.name,src,event.dst));
 				transitions.put(new EventKey(event.name, src), event.dst);
 				allStates.add(src);
 			}

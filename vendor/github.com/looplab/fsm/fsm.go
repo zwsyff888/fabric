@@ -25,6 +25,7 @@
 package fsm
 
 import (
+	"fmt"
 	"strings"
 )
 
@@ -228,6 +229,7 @@ func (f *FSM) Event(event string, args ...interface{}) error {
 	}
 
 	dst, ok := f.transitions[eKey{event, f.current}]
+	fmt.Printf("Event event:%v current:%v dst%v transitions:%v", event, f.current, dst, f.transitions)
 	if !ok {
 		for ekey := range f.transitions {
 			if ekey.event == event {
