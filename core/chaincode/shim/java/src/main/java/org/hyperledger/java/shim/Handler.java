@@ -80,8 +80,8 @@ public class Handler {
 				new CBDesc(BEFORE_EVENT,	REGISTERED.toString(), 	(event) -> beforeRegistered(event)),
 				new CBDesc(AFTER_EVENT, 	RESPONSE.toString(), 	(event) -> afterResponse(event)),
 				new CBDesc(AFTER_EVENT, 	ERROR.toString(), 		(event) -> afterError(event)),
-				new CBDesc(ENTER_STATE, 	INIT.toString(), 		(event) -> enterInitState(event)),
-				new CBDesc(ENTER_STATE, 	TRANSACTION.toString(), (event) -> enterTransactionState(event))
+				new CBDesc(BEFORE_EVENT, 	INIT.toString(), 		(event) -> enterInitState(event)),
+				new CBDesc(BEFORE_EVENT, 	TRANSACTION.toString(), (event) -> enterTransactionState(event))
 				);
 		logger.info(REGISTERED.toString()+","+RESPONSE.toString()+","+ERROR.toString()+","+INIT.toString()+","+TRANSACTION.toString());
 	}

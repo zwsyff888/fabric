@@ -142,7 +142,7 @@ public class FSM {
 		if (transition != null) throw new InTrasistionException(eventName);
 
 		String dst = transitions.get(new EventKey(eventName, current));
-		logger.info("TRANSACTION EVENT %s , %s , %s",eventName,current,dst);
+		logger.info(String.format("TRANSACTION EVENT %s , %s , %s",eventName,current,dst));
 		if (dst == null) {
 			for (EventKey key : transitions.keySet()) {
 				if (key.event.equals(eventName)) {
