@@ -83,6 +83,7 @@ public class Handler {
 				new CBDesc(ENTER_STATE, 	INIT.toString(), 		(event) -> enterInitState(event)),
 				new CBDesc(ENTER_STATE, 	TRANSACTION.toString(), (event) -> enterTransactionState(event))
 				);
+		logger.info(REGISTERED.toString()+","+RESPONSE.toString()+","+ERROR.toString()+","+INIT.toString()+","+TRANSACTION.toString());
 	}
 
 	public static String shortID(String uuid) {
@@ -778,6 +779,8 @@ public class Handler {
 		// Filter errors to allow NoTransitionError and CanceledError 
 		// to not propagate for cases where embedded Err == nil.
 		try {
+			logger.info(String.format("fsm.raiseEvent %s , %s",
+					message.getType().toString(), message.toString()));
 			fsm.raiseEvent(message.getType().toString(), message);
 		} catch (NoTransitionException e) {
 			if (e.error != null) throw e;
