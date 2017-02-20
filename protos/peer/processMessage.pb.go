@@ -27,7 +27,7 @@ type QueryBlocks struct {
 func (m *QueryBlocks) Reset()                    { *m = QueryBlocks{} }
 func (m *QueryBlocks) String() string            { return proto.CompactTextString(m) }
 func (*QueryBlocks) ProtoMessage()               {}
-func (*QueryBlocks) Descriptor() ([]byte, []int) { return fileDescriptor6, []int{0} }
+func (*QueryBlocks) Descriptor() ([]byte, []int) { return fileDescriptor7, []int{0} }
 
 type ChannelMessage struct {
 	ChannelInput []*MessageInput `protobuf:"bytes,1,rep,name=ChannelInput" json:"ChannelInput,omitempty"`
@@ -36,7 +36,7 @@ type ChannelMessage struct {
 func (m *ChannelMessage) Reset()                    { *m = ChannelMessage{} }
 func (m *ChannelMessage) String() string            { return proto.CompactTextString(m) }
 func (*ChannelMessage) ProtoMessage()               {}
-func (*ChannelMessage) Descriptor() ([]byte, []int) { return fileDescriptor6, []int{1} }
+func (*ChannelMessage) Descriptor() ([]byte, []int) { return fileDescriptor7, []int{1} }
 
 func (m *ChannelMessage) GetChannelInput() []*MessageInput {
 	if m != nil {
@@ -56,7 +56,7 @@ type MessageInput struct {
 func (m *MessageInput) Reset()                    { *m = MessageInput{} }
 func (m *MessageInput) String() string            { return proto.CompactTextString(m) }
 func (*MessageInput) ProtoMessage()               {}
-func (*MessageInput) Descriptor() ([]byte, []int) { return fileDescriptor6, []int{2} }
+func (*MessageInput) Descriptor() ([]byte, []int) { return fileDescriptor7, []int{2} }
 
 func (m *MessageInput) GetMblocks() []*Mblock {
 	if m != nil {
@@ -74,7 +74,7 @@ type Mblock struct {
 func (m *Mblock) Reset()                    { *m = Mblock{} }
 func (m *Mblock) String() string            { return proto.CompactTextString(m) }
 func (*Mblock) ProtoMessage()               {}
-func (*Mblock) Descriptor() ([]byte, []int) { return fileDescriptor6, []int{3} }
+func (*Mblock) Descriptor() ([]byte, []int) { return fileDescriptor7, []int{3} }
 
 func (m *Mblock) GetHeader() *MblockHeader {
 	if m != nil {
@@ -107,7 +107,7 @@ type MblockHeader struct {
 func (m *MblockHeader) Reset()                    { *m = MblockHeader{} }
 func (m *MblockHeader) String() string            { return proto.CompactTextString(m) }
 func (*MblockHeader) ProtoMessage()               {}
-func (*MblockHeader) Descriptor() ([]byte, []int) { return fileDescriptor6, []int{4} }
+func (*MblockHeader) Descriptor() ([]byte, []int) { return fileDescriptor7, []int{4} }
 
 type MblockData struct {
 	Datas []*TransData `protobuf:"bytes,1,rep,name=Datas" json:"Datas,omitempty"`
@@ -116,7 +116,7 @@ type MblockData struct {
 func (m *MblockData) Reset()                    { *m = MblockData{} }
 func (m *MblockData) String() string            { return proto.CompactTextString(m) }
 func (*MblockData) ProtoMessage()               {}
-func (*MblockData) Descriptor() ([]byte, []int) { return fileDescriptor6, []int{5} }
+func (*MblockData) Descriptor() ([]byte, []int) { return fileDescriptor7, []int{5} }
 
 func (m *MblockData) GetDatas() []*TransData {
 	if m != nil {
@@ -139,7 +139,7 @@ type TransData struct {
 func (m *TransData) Reset()                    { *m = TransData{} }
 func (m *TransData) String() string            { return proto.CompactTextString(m) }
 func (*TransData) ProtoMessage()               {}
-func (*TransData) Descriptor() ([]byte, []int) { return fileDescriptor6, []int{6} }
+func (*TransData) Descriptor() ([]byte, []int) { return fileDescriptor7, []int{6} }
 
 func (m *TransData) GetTime() *google_protobuf1.Timestamp {
 	if m != nil {
@@ -155,7 +155,7 @@ type MblockMetadata struct {
 func (m *MblockMetadata) Reset()                    { *m = MblockMetadata{} }
 func (m *MblockMetadata) String() string            { return proto.CompactTextString(m) }
 func (*MblockMetadata) ProtoMessage()               {}
-func (*MblockMetadata) Descriptor() ([]byte, []int) { return fileDescriptor6, []int{7} }
+func (*MblockMetadata) Descriptor() ([]byte, []int) { return fileDescriptor7, []int{7} }
 
 type MessageOutput struct {
 	Output string `protobuf:"bytes,1,opt,name=output" json:"output,omitempty"`
@@ -164,7 +164,7 @@ type MessageOutput struct {
 func (m *MessageOutput) Reset()                    { *m = MessageOutput{} }
 func (m *MessageOutput) String() string            { return proto.CompactTextString(m) }
 func (*MessageOutput) ProtoMessage()               {}
-func (*MessageOutput) Descriptor() ([]byte, []int) { return fileDescriptor6, []int{8} }
+func (*MessageOutput) Descriptor() ([]byte, []int) { return fileDescriptor7, []int{8} }
 
 func init() {
 	proto.RegisterType((*QueryBlocks)(nil), "protos.QueryBlocks")
@@ -247,7 +247,7 @@ var _StatusPeer_serviceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: fileDescriptor6,
+	Metadata: fileDescriptor7,
 }
 
 // Client API for QueryPeer service
@@ -311,12 +311,12 @@ var _QueryPeer_serviceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: fileDescriptor6,
+	Metadata: fileDescriptor7,
 }
 
-func init() { proto.RegisterFile("peer/processMessage.proto", fileDescriptor6) }
+func init() { proto.RegisterFile("peer/processMessage.proto", fileDescriptor7) }
 
-var fileDescriptor6 = []byte{
+var fileDescriptor7 = []byte{
 	// 619 bytes of a gzipped FileDescriptorProto
 	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x09, 0x6e, 0x88, 0x02, 0xff, 0x5c, 0x54, 0xcd, 0x6e, 0xd3, 0x4c,
 	0x14, 0xad, 0xbf, 0xba, 0x69, 0x73, 0x93, 0x2f, 0x12, 0x43, 0xa9, 0x4c, 0x84, 0x20, 0xf2, 0x82,

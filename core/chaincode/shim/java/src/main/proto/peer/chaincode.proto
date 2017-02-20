@@ -19,7 +19,7 @@ syntax = "proto3";
 package protos;
 option java_package = "org.hyperledger.protos";
 option go_package = "github.com/hyperledger/fabric/protos/peer";
-import "peer/chaincodeevent.proto";
+import "chaincodeevent.proto";
 import "google/protobuf/timestamp.proto";
 
 

@@ -69,6 +69,7 @@ JAVASHIM_DEPS =  $(shell git ls-files core/chaincode/shim/java)
 PROTOS = $(shell git ls-files *.proto | grep -v vendor)
 MSP_SAMPLECONFIG = $(shell git ls-files msp/sampleconfig/*.pem)
 PROJECT_FILES = $(shell git ls-files)
+@echo $(PROJECT_FILES)
 IMAGES = peer orderer ccenv javaenv buildenv #testenv zookeeper kafka couchdb
 
 pkgmap.configtxgen    := $(PKGNAME)/common/configtx/tool/configtxgen
@@ -172,7 +173,7 @@ build/docker/gotools: gotools/Makefile
 build/bin/peer: build/image/ccenv/$(DUMMY) #build/image/javaenv/$(DUMMY)
 build/image/peer/$(DUMMY): build/image/ccenv/$(DUMMY) #build/image/javaenv/$(DUMMY)
 
-build/bin/%: $(PROJECT_FILES)
+build/bin/%: #$(PROJECT_FILES)
 	@mkdir -p $(@D)
 	@echo "$@"
 	$(CGO_FLAGS) GOBIN=$(abspath $(@D)) go install -ldflags "$(GO_LDFLAGS)" $(pkgmap.$(@F))

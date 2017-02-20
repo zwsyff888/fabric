@@ -26,7 +26,7 @@ type PeerReply struct {
 func (m *PeerReply) Reset()                    { *m = PeerReply{} }
 func (m *PeerReply) String() string            { return proto.CompactTextString(m) }
 func (*PeerReply) ProtoMessage()               {}
-func (*PeerReply) Descriptor() ([]byte, []int) { return fileDescriptor9, []int{0} }
+func (*PeerReply) Descriptor() ([]byte, []int) { return fileDescriptor10, []int{0} }
 
 type ConnectPeer struct {
 	Endpoint string `protobuf:"bytes,1,opt,name=Endpoint" json:"Endpoint,omitempty"`
@@ -37,7 +37,7 @@ type ConnectPeer struct {
 func (m *ConnectPeer) Reset()                    { *m = ConnectPeer{} }
 func (m *ConnectPeer) String() string            { return proto.CompactTextString(m) }
 func (*ConnectPeer) ProtoMessage()               {}
-func (*ConnectPeer) Descriptor() ([]byte, []int) { return fileDescriptor9, []int{1} }
+func (*ConnectPeer) Descriptor() ([]byte, []int) { return fileDescriptor10, []int{1} }
 
 type PeerInfo struct {
 	PeerHeight   uint64         `protobuf:"varint,1,opt,name=peerHeight" json:"peerHeight,omitempty"`
@@ -48,7 +48,7 @@ type PeerInfo struct {
 func (m *PeerInfo) Reset()                    { *m = PeerInfo{} }
 func (m *PeerInfo) String() string            { return proto.CompactTextString(m) }
 func (*PeerInfo) ProtoMessage()               {}
-func (*PeerInfo) Descriptor() ([]byte, []int) { return fileDescriptor9, []int{2} }
+func (*PeerInfo) Descriptor() ([]byte, []int) { return fileDescriptor10, []int{2} }
 
 func (m *PeerInfo) GetPeerEndpoint() *PeerEndpoint {
 	if m != nil {
@@ -139,12 +139,12 @@ var _Supervise_serviceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: fileDescriptor9,
+	Metadata: fileDescriptor10,
 }
 
-func init() { proto.RegisterFile("peer/server_supervise.proto", fileDescriptor9) }
+func init() { proto.RegisterFile("peer/server_supervise.proto", fileDescriptor10) }
 
-var fileDescriptor9 = []byte{
+var fileDescriptor10 = []byte{
 	// 317 bytes of a gzipped FileDescriptorProto
 	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x09, 0x6e, 0x88, 0x02, 0xff, 0x54, 0x91, 0x5d, 0x4b, 0xf3, 0x30,
 	0x14, 0xc7, 0x9f, 0x3e, 0x53, 0xb7, 0x9d, 0x0d, 0xd4, 0xb8, 0x8b, 0xd2, 0x81, 0x8c, 0x82, 0x30,
