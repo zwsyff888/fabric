@@ -46,9 +46,16 @@ func validateChaincodeProposalMessage(prop *pb.Proposal, hdr *common.Header) (*p
 	// TODO: should we even do this? If so, using which interface?
 
 	//    - ensure that the visibility field has some value we understand
-	// TODO: we need to define visibility fields first
-
-	// TODO: should we check the payload as well?
+	// currently the fabric only supports full visibility: this means that
+	// there are no restrictions on which parts of the proposal payload will
+	// be visible in the final transaction; this default approach requires
+	// no additional instructions in the PayloadVisibility field which is
+	// therefore expected to be nil; however the fabric may be extended to
+	// encode more elaborate visibility mechanisms that shall be encoded in
+	// this field (and handled appropriately by the peer)
+	if chaincodeHdrExt.PayloadVisibility != nil {
+		return nil, fmt.Errorf("Invalid payload visibility field")
+	}
 
 	return chaincodeHdrExt, nil
 }
@@ -85,7 +92,16 @@ func ValidateProposalMessage(signedProp *pb.SignedProposal) (*pb.Proposal, *comm
 
 	// TODO: ensure that creator can transact with us (some ACLs?) which set of APIs is supposed to give us this info?
 
-	// TODO: perform a check against replay attacks
+	// Verify that the transaction ID has been computed properly.
+	// This check is needed to ensure that the lookup into the ledger
+	// for the same TxID catches duplicates.
+	err = utils.CheckProposalTxID(
+		hdr.ChannelHeader.TxId,
+		hdr.SignatureHeader.Nonce,
+		hdr.SignatureHeader.Creator)
+	if err != nil {
+		return nil, nil, nil, err
+	}
 
 	// continue the validation in a way that depends on the type specified in the header
 	switch common.HeaderType(hdr.ChannelHeader.Type) {
@@ -190,9 +206,15 @@ func validateChannelHeader(cHdr *common.ChannelHeader) error {
 
 	// TODO: validate chainID in cHdr.ChainID
 
-	// TODO: validate epoch in cHdr.Epoch
+	// Validate epoch in cHdr.Epoch
+	// Currently we enforce that Epoch is 0.
+	// TODO: This check will be modified once the Epoch management
+	// will be in place.
+	if cHdr.Epoch != 0 {
+		return fmt.Errorf("Invalid Epoch in ChannelHeader. It must be 0. It was [%d]", cHdr.Epoch)
+	}
 
-	// TODO: validate version in cHdr.Version
+	// TODO: Validate version in cHdr.Version
 
 	return nil
 }
@@ -349,15 +371,27 @@ func ValidateTransaction(e *common.Envelope) (*common.Payload, error) {
 
 	// TODO: ensure that creator can transact with us (some ACLs?) which set of APIs is supposed to give us this info?
 
-	// TODO: perform a check against replay attacks
-
 	// continue the validation in a way that depends on the type specified in the header
 	switch common.HeaderType(payload.Header.ChannelHeader.Type) {
 	case common.HeaderType_ENDORSER_TRANSACTION:
+		// Verify that the transaction ID has been computed properly.
+		// This check is needed to ensure that the lookup into the ledger
+		// for the same TxID catches duplicates.
+		err = utils.CheckProposalTxID(
+			payload.Header.ChannelHeader.TxId,
+			payload.Header.SignatureHeader.Nonce,
+			payload.Header.SignatureHeader.Creator)
+		if err != nil {
+			return nil, err
+		}
+
 		err = validateEndorserTransaction(payload.Data, payload.Header)
 		putilsLogger.Infof("ValidateTransactionEnvelope returns err %s", err)
 		return payload, err
 	case common.HeaderType_CONFIG:
+		// Config transactions have signatures inside which will be validated, especially at genesis there may be no creator or
+		// signature on the outermost envelope
+
 		err = validateConfigTransaction(payload.Data, payload.Header)
 		putilsLogger.Infof("ValidateTransactionEnvelope returns err %s", err)
 		return payload, err

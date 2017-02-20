@@ -34,6 +34,7 @@ func writeChaincodePackage(spec *pb.ChaincodeSpec, tw *tar.Writer) error {
 	}
 
 	err = cutil.WriteGopathSrc(tw, urlLocation)
+	logger.Infof("urlLocation %v", urlLocation)
 	if err != nil {
 		return fmt.Errorf("Error writing Chaincode package contents: %s", err)
 	}

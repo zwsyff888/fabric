@@ -108,6 +108,12 @@ peer:
         recvBuffSize: 20
         # Buffer size of sending messages
         sendBuffSize: 20
+        # Time to wait before pull engine processes incoming digests (unit: second)
+        digestWaitTime: 1s
+        # Time to wait before pull engine removes incoming nonce (unit: second)
+        requestWaitTime: 1s
+        # Time to wait before pull engine ends pull (unit: second)
+        responseWaitTime: 2s
 
         # This is an endpoint that is published to peers outside of the organization.
         # If this isn't set, the peer will not be known to other organizations.
@@ -276,20 +282,17 @@ chaincode:
         path:
         name:
 
-    golang:
+    # Generic builder environment, suitable for most chaincode types
+    builder: hyperledger/fabric-ccenv:$(ARCH)-$(PROJECT_VERSION)
 
-        # This is the basis for the Golang Dockerfile.  Additional commands will
-        # be appended depedendent upon the chaincode specification.
-        Dockerfile:  |
-          FROM hyperledger/fabric-ccenv:$(ARCH)-$(PROJECT_VERSION)
-          WORKDIR $GOPATH
+    golang:
+        # golang will never need more than baseos
+        runtime: hyperledger/fabric-baseos:$(ARCH)-$(BASE_VERSION)
 
     car:
-
-        # This is the basis for the CAR Dockerfile.  Additional commands will
-        # be appended depedendent upon the chaincode specification.
-        Dockerfile:  |
-            FROM hyperledger/fabric-ccenv:$(ARCH)-$(PROJECT_VERSION)
+        # car may need more facilities (JVM, etc) in the future as the catalog
+        # of platforms are expanded.  For now, we can just use baseos
+        runtime: hyperledger/fabric-baseos:$(ARCH)-$(BASE_VERSION)
 
     java:
         # This is an image based on java:openjdk-8 with addition compiler
@@ -312,10 +315,6 @@ chaincode:
     #net - in net mode validator will run chaincode in a docker container
 
     mode: net
-    # typically installpath should not be modified. Otherwise, user must ensure
-    # the chaincode executable is placed in the path specifed by installpath in
-    # the image
-    installpath: /opt/gopath/bin/
 
     # keepalive in seconds. In situations where the communiction goes through a
     # proxy that does not support keep-alive, this parameter will maintain connection
@@ -359,19 +358,7 @@ ledger:
     # historyDatabase - options are true or false
     # Indicates if the history of key updates should be stored in goleveldb
     historyDatabase: true
-
-###############################################################################
-#
-#    Security section - Applied to all entities (client, NVP, VP)
-#
-###############################################################################
-security:
-    # Can be 256 or 384.
-    level: 256
-
-    # Can be SHA2 or SHA3.
-    hashAlgorithm: SHA2
-
+    
 ###############################################################################
 #
 #    supervise client

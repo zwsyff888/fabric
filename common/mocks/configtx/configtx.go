@@ -17,7 +17,8 @@ limitations under the License.
 package configtx
 
 import (
-	configtxapi "github.com/hyperledger/fabric/common/configtx/api"
+	configvaluesapi "github.com/hyperledger/fabric/common/configvalues"
+	configvalueschannel "github.com/hyperledger/fabric/common/configvalues/channel"
 	mockpolicies "github.com/hyperledger/fabric/common/mocks/policies"
 	"github.com/hyperledger/fabric/common/policies"
 	"github.com/hyperledger/fabric/msp"
@@ -29,13 +30,13 @@ type Resources struct {
 	PolicyManagerVal *mockpolicies.Manager
 
 	// ChannelConfigVal is returned as the result of ChannelConfig()
-	ChannelConfigVal configtxapi.ChannelConfig
+	ChannelConfigVal configvalueschannel.ConfigReader
 
 	// OrdererConfigVal is returned as the result of OrdererConfig()
-	OrdererConfigVal configtxapi.OrdererConfig
+	OrdererConfigVal configvaluesapi.Orderer
 
 	// ApplicationConfigVal is returned as the result of ApplicationConfig()
-	ApplicationConfigVal configtxapi.ApplicationConfig
+	ApplicationConfigVal configvaluesapi.Application
 
 	// MSPManagerVal is returned as the result of MSPManager()
 	MSPManagerVal msp.MSPManager
@@ -47,17 +48,17 @@ func (r *Resources) PolicyManager() policies.Manager {
 }
 
 // Returns the ChannelConfigVal
-func (r *Resources) ChannelConfig() configtxapi.ChannelConfig {
+func (r *Resources) ChannelConfig() configvalueschannel.ConfigReader {
 	return r.ChannelConfigVal
 }
 
 // Returns the OrdererConfigVal
-func (r *Resources) OrdererConfig() configtxapi.OrdererConfig {
+func (r *Resources) OrdererConfig() configvaluesapi.Orderer {
 	return r.OrdererConfigVal
 }
 
 // Returns the ApplicationConfigVal
-func (r *Resources) ApplicationConfig() configtxapi.ApplicationConfig {
+func (r *Resources) ApplicationConfig() configvaluesapi.Application {
 	return r.ApplicationConfigVal
 }
 
@@ -66,68 +67,82 @@ func (r *Resources) MSPManager() msp.MSPManager {
 	return r.MSPManagerVal
 }
 
+// Transactional implements the configtxapi.Transactional
 type Transactional struct{}
 
-// BeginConfig calls through to the HandlerVal
-func (t *Transactional) BeginConfig() {}
+// CommitConfig does nothing
+func (t *Transactional) CommitProposals() {}
 
-// CommitConfig calls through to the HandlerVal
-func (t *Transactional) CommitConfig() {}
-
-// RollbackConfig calls through to the HandlerVal
-func (t *Transactional) RollbackConfig() {}
+// RollbackConfig does nothing
+func (t *Transactional) RollbackProposals() {}
 
 // Initializer mocks the configtxapi.Initializer interface
 type Initializer struct {
-	Transactional
 	Resources
 
-	// HandlersVal is returned as the result of Handlers()
-	HandlerVal configtxapi.Handler
+	// PolicyProposerVal is returned by PolicyProposers
+	PolicyProposerVal *PolicyProposer
 
-	// PolicyHandlerVal is reutrned at the result of PolicyHandler()
-	PolicyHandlerVal *PolicyHandler
+	// ValueProposerVal is returned by ValueProposers
+	ValueProposerVal *ValueProposer
 }
 
-// Returns the HandlersVal
-func (i *Initializer) Handler(path []string) (configtxapi.Handler, error) {
-	return i.HandlerVal, nil
+// PolicyProposers returns PolicyProposerVal
+func (i *Initializer) PolicyProposer() policies.Proposer {
+	return i.PolicyProposerVal
 }
 
-// Returns the PolicyHandlerVal
-func (i *Initializer) PolicyHandler() configtxapi.PolicyHandler {
-	return i.PolicyHandlerVal
+// ValueProposers returns ValueProposerVal
+func (i *Initializer) ValueProposer() configvaluesapi.ValueProposer {
+	return i.ValueProposerVal
 }
 
-// PolicyHandler mocks the configtxapi.PolicyHandler interface
-type PolicyHandler struct {
+// PolicyProposer mocks the policies.Proposer interface
+type PolicyProposer struct {
 	Transactional
 	LastKey               string
-	LastPath              []string
-	LastValue             *cb.ConfigPolicy
+	LastPolicy            *cb.ConfigPolicy
 	ErrorForProposePolicy error
 }
 
 // ProposeConfig sets LastKey to key, LastPath to path, and LastPolicy to configPolicy, returning ErrorForProposedConfig
-func (ph *PolicyHandler) ProposePolicy(key string, path []string, configPolicy *cb.ConfigPolicy) error {
-	ph.LastKey = key
-	ph.LastValue = configPolicy
-	ph.LastPath = path
-	return ph.ErrorForProposePolicy
+func (pp *PolicyProposer) ProposePolicy(key string, configPolicy *cb.ConfigPolicy) error {
+	pp.LastKey = key
+	pp.LastPolicy = configPolicy
+	return pp.ErrorForProposePolicy
+}
+
+// BeginConfig will be removed in the future
+func (pp *PolicyProposer) BeginPolicyProposals(groups []string) ([]policies.Proposer, error) {
+	handlers := make([]policies.Proposer, len(groups))
+	for i := range handlers {
+		handlers[i] = pp
+	}
+	return handlers, nil
 }
 
 // Handler mocks the configtxapi.Handler interface
-type Handler struct {
+type ValueProposer struct {
+	Transactional
 	LastKey               string
 	LastValue             *cb.ConfigValue
 	ErrorForProposeConfig error
 }
 
 // ProposeConfig sets LastKey to key, and LastValue to configValue, returning ErrorForProposedConfig
-func (h *Handler) ProposeConfig(key string, configValue *cb.ConfigValue) error {
-	h.LastKey = key
-	h.LastValue = configValue
-	return h.ErrorForProposeConfig
+func (vp *ValueProposer) ProposeValue(key string, configValue *cb.ConfigValue) error {
+	vp.LastKey = key
+	vp.LastValue = configValue
+	return vp.ErrorForProposeConfig
+}
+
+// BeginConfig returns slices populated by self
+func (vp *ValueProposer) BeginValueProposals(groups []string) ([]configvaluesapi.ValueProposer, error) {
+	handlers := make([]configvaluesapi.ValueProposer, len(groups))
+	for i := range handlers {
+		handlers[i] = vp
+	}
+	return handlers, nil
 }
 
 // Manager is a mock implementation of configtxapi.Manager
@@ -144,10 +159,16 @@ type Manager struct {
 	ApplyVal error
 
 	// AppliedConfigUpdateEnvelope is set by Apply
-	AppliedConfigUpdateEnvelope *cb.Envelope
+	AppliedConfigUpdateEnvelope *cb.ConfigEnvelope
 
 	// ValidateVal is returned by Validate
 	ValidateVal error
+
+	// ProposeConfigUpdateError is returned as the error value for ProposeConfigUpdate
+	ProposeConfigUpdateError error
+
+	// ProposeConfigUpdateVal is returns as the value for ProposeConfigUpdate
+	ProposeConfigUpdateVal *cb.ConfigEnvelope
 }
 
 // ConfigEnvelope is currently unimplemented
@@ -165,13 +186,18 @@ func (cm *Manager) Sequence() uint64 {
 	return cm.SequenceVal
 }
 
+// ProposeConfigUpdate
+func (cm *Manager) ProposeConfigUpdate(update *cb.Envelope) (*cb.ConfigEnvelope, error) {
+	return cm.ProposeConfigUpdateVal, cm.ProposeConfigUpdateError
+}
+
 // Apply returns ApplyVal
-func (cm *Manager) Apply(configtx *cb.Envelope) error {
-	cm.AppliedConfigUpdateEnvelope = configtx
+func (cm *Manager) Apply(configEnv *cb.ConfigEnvelope) error {
+	cm.AppliedConfigUpdateEnvelope = configEnv
 	return cm.ApplyVal
 }
 
 // Validate returns ValidateVal
-func (cm *Manager) Validate(configtx *cb.Envelope) error {
+func (cm *Manager) Validate(configEnv *cb.ConfigEnvelope) error {
 	return cm.ValidateVal
 }

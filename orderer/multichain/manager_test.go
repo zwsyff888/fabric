@@ -24,6 +24,7 @@ import (
 	"github.com/hyperledger/fabric/common/configtx"
 	genesisconfig "github.com/hyperledger/fabric/common/configtx/tool/localconfig"
 	"github.com/hyperledger/fabric/common/configtx/tool/provisional"
+	mockcrypto "github.com/hyperledger/fabric/common/mocks/crypto"
 	ordererledger "github.com/hyperledger/fabric/orderer/ledger"
 	ramledger "github.com/hyperledger/fabric/orderer/ledger/ram"
 	cb "github.com/hyperledger/fabric/protos/common"
@@ -35,27 +36,25 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-var conf *genesisconfig.TopLevel
-var genesisBlock *cb.Block
+var conf *genesisconfig.Profile
+var genesisBlock = cb.NewBlock(0, nil) // *cb.Block
 
 func init() {
-	conf = genesisconfig.Load()
+	conf = genesisconfig.Load(genesisconfig.SampleInsecureProfile)
 	logging.SetLevel(logging.DEBUG, "")
 	genesisBlock = provisional.New(conf).GenesisBlock()
 }
 
-type mockCryptoHelper struct{}
+func mockCrypto() *mockCryptoHelper {
+	return &mockCryptoHelper{LocalSigner: mockcrypto.FakeLocalSigner}
+}
 
-func (xxx mockCryptoHelper) VerifySignature(sd *cb.SignedData) error {
+type mockCryptoHelper struct {
+	*mockcrypto.LocalSigner
+}
+
+func (mch mockCryptoHelper) VerifySignature(sd *cb.SignedData) error {
 	return nil
-}
-
-func (xxx mockCryptoHelper) NewSignatureHeader() (*cb.SignatureHeader, error) {
-	return &cb.SignatureHeader{}, nil
-}
-
-func (xxx mockCryptoHelper) Sign(message []byte) ([]byte, error) {
-	return message, nil
 }
 
 func NewRAMLedgerAndFactory(maxSize int) (ordererledger.Factory, ordererledger.ReadWriter) {
@@ -129,7 +128,7 @@ func TestNoSystemChain(t *testing.T) {
 	consenters := make(map[string]Consenter)
 	consenters[conf.Orderer.OrdererType] = &mockConsenter{}
 
-	NewManagerImpl(lf, consenters, &mockCryptoHelper{})
+	NewManagerImpl(lf, consenters, mockCrypto())
 }
 
 // This test essentially brings the entire system up and is ultimately what main.go will replicate
@@ -139,7 +138,7 @@ func TestManagerImpl(t *testing.T) {
 	consenters := make(map[string]Consenter)
 	consenters[conf.Orderer.OrdererType] = &mockConsenter{}
 
-	manager := NewManagerImpl(lf, consenters, &mockCryptoHelper{})
+	manager := NewManagerImpl(lf, consenters, mockCrypto())
 
 	_, ok := manager.GetChain("Fake")
 	if ok {
@@ -185,7 +184,7 @@ func TestSignatureFilter(t *testing.T) {
 	consenters := make(map[string]Consenter)
 	consenters[conf.Orderer.OrdererType] = &mockConsenter{}
 
-	manager := NewManagerImpl(lf, consenters, &mockCryptoHelper{})
+	manager := NewManagerImpl(lf, consenters, mockCrypto())
 
 	cs, ok := manager.GetChain(provisional.TestChainID)
 
@@ -217,13 +216,12 @@ func TestSignatureFilter(t *testing.T) {
 
 // This test brings up the entire system, with the mock consenter, including the broadcasters etc. and creates a new chain
 func TestNewChain(t *testing.T) {
-	conf := genesisconfig.Load()
 	lf, rl := NewRAMLedgerAndFactory(10)
 
 	consenters := make(map[string]Consenter)
 	consenters[conf.Orderer.OrdererType] = &mockConsenter{}
 
-	manager := NewManagerImpl(lf, consenters, &mockCryptoHelper{})
+	manager := NewManagerImpl(lf, consenters, mockCrypto())
 
 	generator := provisional.New(conf)
 	channelTemplate := generator.ChannelTemplate()
@@ -253,9 +251,15 @@ func TestNewChain(t *testing.T) {
 		if len(block.Data.Data) != 1 {
 			t.Fatalf("Should have had only one message in the orderer transaction block")
 		}
-		genesisConfigTx := utils.UnmarshalEnvelopeOrPanic(utils.UnmarshalPayloadOrPanic(utils.ExtractEnvelopeOrPanic(block, 0).Payload).Data)
-		if !reflect.DeepEqual(genesisConfigTx, newChainMessage) {
-			t.Errorf("Orderer config block contains wrong transaction, expected %v got %v", genesisConfigTx, newChainMessage)
+		configEnv, err := configtx.UnmarshalConfigEnvelope(utils.UnmarshalPayloadOrPanic(
+			utils.UnmarshalEnvelopeOrPanic(utils.UnmarshalPayloadOrPanic(utils.ExtractEnvelopeOrPanic(block, 0).Payload).Data).Payload).Data)
+
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if !reflect.DeepEqual(configEnv.LastUpdate, newChainMessage) {
+			t.Errorf("Orderer config block contains wrong transaction, expected %v got %v", configEnv.LastUpdate, newChainMessage)
 		}
 	case <-time.After(time.Second):
 		t.Fatalf("Block 1 not produced after timeout in system chain")
@@ -286,9 +290,13 @@ func TestNewChain(t *testing.T) {
 		if len(block.Data.Data) != 1 {
 			t.Fatalf("Should have had only one message in the new genesis block")
 		}
-		genesisConfigTx := utils.ExtractEnvelopeOrPanic(block, 0)
-		if !reflect.DeepEqual(genesisConfigTx, newChainMessage) {
-			t.Errorf("Genesis block contains wrong transaction, expected %v got %v", genesisConfigTx, newChainMessage)
+		configEnv, err := configtx.ConfigEnvelopeFromBlock(block)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if !reflect.DeepEqual(configEnv.LastUpdate, newChainMessage) {
+			t.Errorf("Genesis block contains wrong transaction, expected %v got %v", configEnv.LastUpdate, newChainMessage)
 		}
 	case <-time.After(time.Second):
 		t.Fatalf("Block 1 not produced after timeout in system chain")

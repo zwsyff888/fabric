@@ -28,14 +28,15 @@ import org.hyperledger.java.fsm.exceptions.CancelledException;
 import org.hyperledger.java.fsm.exceptions.NoTransitionException;
 import org.hyperledger.java.helper.Channel;
 import org.hyperledger.protos.Chaincode.*;
-import org.hyperledger.protos.Chaincode.ChaincodeMessage.Builder;
+import org.hyperledger.protos.Chaincodeshim.*;
+import org.hyperledger.protos.Chaincodeshim.ChaincodeMessage.Builder;
 
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 import static org.hyperledger.java.fsm.CallbackType.*;
-import static org.hyperledger.protos.Chaincode.ChaincodeMessage.Type.*;
+import static org.hyperledger.protos.Chaincodeshim.ChaincodeMessage.Type.*;
 
 public class Handler {
 
@@ -63,16 +64,15 @@ public class Handler {
 		fsm.addEvents(
 				//				Event Name				Destination		Sources States
 				new EventDesc(REGISTERED.toString(), 	"established",	"created"),
-				new EventDesc(INIT.toString(), 			"init", 		"established"),
 				new EventDesc(READY.toString(), 		"ready", 		"established"),
 				new EventDesc(ERROR.toString(), 		"established", 	"init"),
 				new EventDesc(RESPONSE.toString(),		"init", 		"init"),
-				new EventDesc(COMPLETED.toString(), 	"ready", 		"init"),
-				new EventDesc(TRANSACTION.toString(),	"transaction", 	"ready"),
-				new EventDesc(COMPLETED.toString(), 	"ready", 		"transaction"),
-				new EventDesc(ERROR.toString(), 		"ready", 		"transaction"),
-				new EventDesc(RESPONSE.toString(), 		"transaction", 	"transaction"),
-				new EventDesc(RESPONSE.toString(), 		"ready", 		"ready")
+				new EventDesc(INIT.toString(),		    "ready", 		"ready"),
+				new EventDesc(TRANSACTION.toString(),	"ready", 	    "ready"),
+				new EventDesc(RESPONSE.toString(), 	    "ready", 		"ready"),
+				new EventDesc(ERROR.toString(), 		"ready", 		"ready"),
+				new EventDesc(COMPLETED.toString(), 	"ready", 	    "init"),
+				new EventDesc(COMPLETED.toString(), 	"ready", 		"ready")
 				);
 
 		fsm.addCallbacks(
@@ -758,7 +758,7 @@ public class Handler {
 			// and it does not touch the state machine
 				return;
 		}
-
+		
 		logger.debug(String.format("[%s]Handling ChaincodeMessage of type: %s(state:%s)",
 				shortID(message), message.getType(), fsm.current()));
 

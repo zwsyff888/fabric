@@ -21,10 +21,11 @@ import (
 
 	"github.com/hyperledger/fabric/common/cauthdsl"
 	"github.com/hyperledger/fabric/common/configtx/api"
-	configtxapplication "github.com/hyperledger/fabric/common/configtx/handlers/application"
-	configtxchannel "github.com/hyperledger/fabric/common/configtx/handlers/channel"
-	configtxmsp "github.com/hyperledger/fabric/common/configtx/handlers/msp"
-	configtxorderer "github.com/hyperledger/fabric/common/configtx/handlers/orderer"
+	configvaluesapi "github.com/hyperledger/fabric/common/configvalues"
+	configvalueschannel "github.com/hyperledger/fabric/common/configvalues/channel"
+	configtxapplication "github.com/hyperledger/fabric/common/configvalues/channel/application"
+	configtxorderer "github.com/hyperledger/fabric/common/configvalues/channel/orderer"
+	configtxmsp "github.com/hyperledger/fabric/common/configvalues/msp"
 	"github.com/hyperledger/fabric/common/policies"
 	"github.com/hyperledger/fabric/msp"
 	cb "github.com/hyperledger/fabric/protos/common"
@@ -32,7 +33,7 @@ import (
 
 type resources struct {
 	policyManager     *policies.ManagerImpl
-	channelConfig     *configtxchannel.SharedConfigImpl
+	channelConfig     *configvalueschannel.Config
 	ordererConfig     *configtxorderer.ManagerImpl
 	applicationConfig *configtxapplication.SharedConfigImpl
 	mspConfigHandler  *configtxmsp.MSPConfigHandler
@@ -44,17 +45,17 @@ func (r *resources) PolicyManager() policies.Manager {
 }
 
 // ChannelConfig returns the api.ChannelConfig for the chain
-func (r *resources) ChannelConfig() api.ChannelConfig {
+func (r *resources) ChannelConfig() configvalueschannel.ConfigReader {
 	return r.channelConfig
 }
 
 // OrdererConfig returns the api.OrdererConfig for the chain
-func (r *resources) OrdererConfig() api.OrdererConfig {
+func (r *resources) OrdererConfig() configvaluesapi.Orderer {
 	return r.ordererConfig
 }
-
+	
 // ApplicationConfig returns the api.ApplicationConfig for the chain
-func (r *resources) ApplicationConfig() api.ApplicationConfig {
+func (r *resources) ApplicationConfig() configvaluesapi.Application {
 	return r.applicationConfig
 }
 
@@ -83,68 +84,92 @@ func newResources() *resources {
 	applicationConfig := configtxapplication.NewSharedConfigImpl(mspConfigHandler)
 
 	return &resources{
-		policyManager:     policies.NewManagerImpl(policyProviderMap),
-		channelConfig:     configtxchannel.NewSharedConfigImpl(ordererConfig, applicationConfig),
+		policyManager:     policies.NewManagerImpl(RootGroupKey, policyProviderMap),
+		channelConfig:     configvalueschannel.NewConfig(ordererConfig, applicationConfig),
 		ordererConfig:     ordererConfig,
 		applicationConfig: applicationConfig,
 		mspConfigHandler:  mspConfigHandler,
 	}
-
 }
+
+type valueProposerRoot struct {
+	channelConfig    *configvalueschannel.Config
+	mspConfigHandler *configtxmsp.MSPConfigHandler
+}
+
+type policyProposerRoot struct {
+	policyManager policies.Proposer
+}
+
+// BeginValueProposals is used to start a new config proposal
+func (v *valueProposerRoot) BeginValueProposals(groups []string) ([]configvaluesapi.ValueProposer, error) {
+	if len(groups) != 1 {
+		logger.Panicf("Initializer only supports having one root group")
+	}
+	logger.Debugf("Calling begin for MSP manager")
+	v.mspConfigHandler.BeginConfig()
+	return []configvaluesapi.ValueProposer{v.channelConfig}, nil
+}
+
+// RollbackConfig is used to abandon a new config proposal
+func (i *valueProposerRoot) RollbackProposals() {
+	logger.Debugf("Calling rollback for MSP manager")
+	i.mspConfigHandler.RollbackProposals()
+}
+
+// CommitConfig is used to commit a new config proposal
+func (i *valueProposerRoot) CommitProposals() {
+	logger.Debugf("Calling commit for MSP manager")
+	i.mspConfigHandler.CommitProposals()
+}
+
+func (i *valueProposerRoot) ProposeValue(key string, value *cb.ConfigValue) error {
+	return fmt.Errorf("Programming error, this should never be invoked")
+}
+
+// BeginPolicyProposals is used to start a new config proposal
+func (p *policyProposerRoot) BeginPolicyProposals(groups []string) ([]policies.Proposer, error) {
+	if len(groups) != 1 {
+		logger.Panicf("Initializer only supports having one root group")
+	}
+	return []policies.Proposer{p.policyManager}, nil
+}
+
+func (i *policyProposerRoot) ProposePolicy(key string, policy *cb.ConfigPolicy) error {
+	return fmt.Errorf("Programming error, this should never be invoked")
+}
+
+// RollbackConfig is used to abandon a new config proposal
+func (i *policyProposerRoot) RollbackProposals() {}
+
+// CommitConfig is used to commit a new config proposal
+func (i *policyProposerRoot) CommitProposals() {}
 
 type initializer struct {
 	*resources
-	is map[string]api.Initializer
+	vpr *valueProposerRoot
+	ppr *policyProposerRoot
 }
 
 // NewInitializer creates a chain initializer for the basic set of common chain resources
 func NewInitializer() api.Initializer {
+	resources := newResources()
 	return &initializer{
-		resources: newResources(),
+		resources: resources,
+		vpr: &valueProposerRoot{
+			channelConfig:    resources.channelConfig,
+			mspConfigHandler: resources.mspConfigHandler,
+		},
+		ppr: &policyProposerRoot{
+			policyManager: resources.policyManager,
+		},
 	}
 }
 
-// BeginConfig is used to start a new config proposal
-func (i *initializer) BeginConfig() {
-	i.policyManager.BeginConfig()
-	i.channelConfig.BeginConfig()
-	i.ordererConfig.BeginConfig()
-	i.applicationConfig.BeginConfig()
-	i.mspConfigHandler.BeginConfig()
+func (i *initializer) PolicyProposer() policies.Proposer {
+	return i.ppr
 }
 
-// RollbackConfig is used to abandon a new config proposal
-func (i *initializer) RollbackConfig() {
-	i.policyManager.RollbackConfig()
-	i.channelConfig.RollbackConfig()
-	i.ordererConfig.RollbackConfig()
-	i.applicationConfig.RollbackConfig()
-	i.mspConfigHandler.RollbackConfig()
-}
-
-// CommitConfig is used to commit a new config proposal
-func (i *initializer) CommitConfig() {
-	i.policyManager.CommitConfig()
-	i.channelConfig.CommitConfig()
-	i.ordererConfig.CommitConfig()
-	i.applicationConfig.CommitConfig()
-	i.mspConfigHandler.CommitConfig()
-}
-
-func (i *initializer) PolicyHandler() api.PolicyHandler {
-	return i.policyManager
-}
-
-func (i *initializer) Handler(path []string) (api.Handler, error) {
-	if len(path) == 0 {
-		return nil, fmt.Errorf("Empty path")
-	}
-
-	switch path[0] {
-	case RootGroupKey:
-		return i.channelConfig.Handler(path[1:])
-	default:
-		return nil, fmt.Errorf("Unknown root group: %s", path[0])
-	}
-
+func (i *initializer) ValueProposer() configvaluesapi.ValueProposer {
+	return i.vpr
 }

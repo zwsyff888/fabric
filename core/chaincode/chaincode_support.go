@@ -42,6 +42,8 @@ import (
 	pb "github.com/hyperledger/fabric/protos/peer"
 )
 
+type key string
+
 const (
 	// DevModeUserRunsChaincode property allows user to run chaincode in development environment
 	DevModeUserRunsChaincode       string = "dev"
@@ -50,10 +52,10 @@ const (
 	peerAddressDefault             string = "0.0.0.0:7051"
 
 	//TXSimulatorKey is used to attach ledger simulation context
-	TXSimulatorKey string = "txsimulatorkey"
+	TXSimulatorKey key = "txsimulatorkey"
 
 	//HistoryQueryExecutorKey is used to attach ledger history query executor context
-	HistoryQueryExecutorKey string = "historyqueryexecutorkey"
+	HistoryQueryExecutorKey key = "historyqueryexecutorkey"
 )
 
 //this is basically the singleton that supports the
@@ -144,12 +146,6 @@ func NewChaincodeSupport(getPeerEndpoint func() (*pb.PeerEndpoint, error), userr
 
 	theChaincodeSupport.ccStartupTimeout = ccstartuptimeout
 
-	//TODO I'm not sure if this needs to be on a per chain basis... too lowel and just needs to be a global default ?
-	theChaincodeSupport.chaincodeInstallPath = viper.GetString("chaincode.installpath")
-	if theChaincodeSupport.chaincodeInstallPath == "" {
-		theChaincodeSupport.chaincodeInstallPath = chaincodeInstallPathDefault
-	}
-
 	theChaincodeSupport.peerTLS = viper.GetBool("peer.tls.enabled")
 	if theChaincodeSupport.peerTLS {
 		theChaincodeSupport.peerTLSCertFile = viper.GetString("peer.tls.cert.file")
@@ -198,19 +194,18 @@ func NewChaincodeSupport(getPeerEndpoint func() (*pb.PeerEndpoint, error), userr
 
 // ChaincodeSupport responsible for providing interfacing with chaincodes from the Peer.
 type ChaincodeSupport struct {
-	runningChaincodes    *runningChaincodes
-	peerAddress          string
-	ccStartupTimeout     time.Duration
-	chaincodeInstallPath string
-	userRunsCC           bool
-	peerNetworkID        string
-	peerID               string
-	peerTLS              bool
-	peerTLSCertFile      string
-	peerTLSKeyFile       string
-	peerTLSSvrHostOrd    string
-	keepalive            time.Duration
-	chaincodeLogLevel    string
+	runningChaincodes *runningChaincodes
+	peerAddress       string
+	ccStartupTimeout  time.Duration
+	userRunsCC        bool
+	peerNetworkID     string
+	peerID            string
+	peerTLS           bool
+	peerTLSCertFile   string
+	peerTLSKeyFile    string
+	peerTLSSvrHostOrd string
+	keepalive         time.Duration
+	chaincodeLogLevel string
 }
 
 // DuplicateChaincodeHandlerError returned if attempt to register same chaincodeID while a stream already exists.
@@ -228,7 +223,10 @@ func newDuplicateChaincodeHandlerError(chaincodeHandler *Handler) error {
 
 func (chaincodeSupport *ChaincodeSupport) registerHandler(chaincodehandler *Handler) error {
 	key := chaincodehandler.ChaincodeID.Name
-
+	chaincodeLogger.Infof("chaincodehandler.ChaincodeID %v", chaincodehandler.ChaincodeID)
+	/*if !strings.ContainsAny(key, ":") {
+		key = fmt.Sprint(key, ":0")
+	}*/
 	chaincodeSupport.runningChaincodes.Lock()
 	defer chaincodeSupport.runningChaincodes.Unlock()
 
@@ -240,6 +238,7 @@ func (chaincodeSupport *ChaincodeSupport) registerHandler(chaincodehandler *Hand
 	}
 	//a placeholder, unregistered handler will be setup by transaction processing that comes
 	//through via consensus. In this case we swap the handler and give it the notify channel
+	chaincodeLogger.Infof("chaincodeMap %v %value", key, chaincodeSupport.runningChaincodes.chaincodeMap)
 	if chrte2 != nil {
 		chaincodehandler.readyNotify = chrte2.handler.readyNotify
 		chrte2.handler = chaincodehandler
@@ -327,6 +326,7 @@ func (chaincodeSupport *ChaincodeSupport) sendReady(context context.Context, ccc
 
 //get args and env given chaincodeID
 func (chaincodeSupport *ChaincodeSupport) getArgsAndEnv(cccid *ccprovider.CCContext, cLang pb.ChaincodeSpec_Type) (args []string, envs []string, err error) {
+
 	canName := cccid.GetCanonicalName()
 	envs = []string{"CORE_CHAINCODE_ID_NAME=" + canName}
 
@@ -356,13 +356,13 @@ func (chaincodeSupport *ChaincodeSupport) getArgsAndEnv(cccid *ccprovider.CCCont
 	switch cLang {
 	case pb.ChaincodeSpec_GOLANG, pb.ChaincodeSpec_CAR:
 		//chaincode executable will be same as the name of the chaincode
-		args = []string{chaincodeSupport.chaincodeInstallPath + cccid.Name, fmt.Sprintf("-peer.address=%s", chaincodeSupport.peerAddress)}
+		args = []string{"chaincode", fmt.Sprintf("-peer.address=%s", chaincodeSupport.peerAddress)}
 		chaincodeLogger.Debugf("Executable is %s", args[0])
 	case pb.ChaincodeSpec_JAVA:
 		//TODO add security args
 		args = strings.Split(
-			fmt.Sprintf("java -jar chaincode.jar -a %s -i %s",
-				chaincodeSupport.peerAddress, cccid.Name),
+			fmt.Sprintf("java -jar chaincode.jar -a %s -i %s -v %s",
+				chaincodeSupport.peerAddress, cccid.Name, cccid.Version),
 			" ")
 		if chaincodeSupport.peerTLS {
 			args = append(args, "-s")
@@ -482,6 +482,7 @@ func (chaincodeSupport *ChaincodeSupport) Stop(context context.Context, cccid *c
 // Launch will launch the chaincode if not running (if running return nil) and will wait for handler of the chaincode to get into FSM ready state.
 func (chaincodeSupport *ChaincodeSupport) Launch(context context.Context, cccid *ccprovider.CCContext, spec interface{}) (*pb.ChaincodeID, *pb.ChaincodeInput, error) {
 	//build the chaincode
+	chaincodeLogger.Infof("launch-zws")
 	var cID *pb.ChaincodeID
 	var cMsg *pb.ChaincodeInput
 	var cLang pb.ChaincodeSpec_Type
@@ -634,6 +635,7 @@ func createCCMessage(typ pb.ChaincodeMessage_Type, txid string, cMsg *pb.Chainco
 
 // Execute executes a transaction and waits for it to complete until a timeout value.
 func (chaincodeSupport *ChaincodeSupport) Execute(ctxt context.Context, cccid *ccprovider.CCContext, msg *pb.ChaincodeMessage, timeout time.Duration) (*pb.ChaincodeMessage, error) {
+	chaincodeLogger.Infof("")
 	canName := cccid.GetCanonicalName()
 	chaincodeSupport.runningChaincodes.Lock()
 	//we expect the chaincode to be running... sanity check

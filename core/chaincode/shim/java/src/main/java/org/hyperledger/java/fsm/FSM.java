@@ -19,6 +19,9 @@ package org.hyperledger.java.fsm;
 import java.util.HashMap;
 import java.util.HashSet;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+
 import org.hyperledger.java.fsm.exceptions.AsyncException;
 import org.hyperledger.java.fsm.exceptions.CancelledException;
 import org.hyperledger.java.fsm.exceptions.InTrasistionException;
@@ -29,6 +32,7 @@ import org.hyperledger.java.fsm.exceptions.UnknownEventException;
 
 public class FSM {
 
+	private static Log logger = LogFactory.getLog(FSM.class);
 	/** The current state of the FSM */
 	private String current;
 
@@ -214,6 +218,7 @@ public class FSM {
 		// Build transition map and store sets of all events and states.
 		for (EventDesc event : events) {
 			for (String src : event.src) {
+				logger.debug(String.format("transitions %s %s %s",event.name,src,event.dst));
 				transitions.put(new EventKey(event.name, src), event.dst);
 				allStates.add(src);
 			}

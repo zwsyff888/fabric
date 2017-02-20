@@ -21,6 +21,7 @@ import (
 
 	"github.com/hyperledger/fabric/common/configtx"
 	configtxapi "github.com/hyperledger/fabric/common/configtx/api"
+	configvaluesapi "github.com/hyperledger/fabric/common/configvalues"
 	ordererledger "github.com/hyperledger/fabric/orderer/ledger"
 	cb "github.com/hyperledger/fabric/protos/common"
 	"github.com/hyperledger/fabric/protos/utils"
@@ -47,7 +48,7 @@ type configResources struct {
 	configtxapi.Manager
 }
 
-func (cr *configResources) SharedConfig() configtxapi.OrdererConfig {
+func (cr *configResources) SharedConfig() configvaluesapi.Orderer {
 	return cr.OrdererConfig()
 }
 
@@ -104,11 +105,11 @@ func NewManagerImpl(ledgerFactory ordererledger.Factory, consenters map[string]C
 			if ml.sysChain != nil {
 				logger.Fatalf("There appear to be two system chains %s and %s", ml.sysChain.support.ChainID(), chainID)
 			}
-			logger.Debugf("Starting with system chain: %x", chainID)
 			chain := newChainSupport(createSystemChainFilters(ml, ledgerResources),
 				ledgerResources,
 				consenters,
 				signer)
+			logger.Infof("Starting with system channel: %s and orderer type %s", chainID, chain.SharedConfig().ConsensusType())
 			ml.chains[string(chainID)] = chain
 			ml.sysChain = newSystemChain(chain)
 			// We delay starting this chain, as it might try to copy and replace the chains map via newChain before the map is fully built

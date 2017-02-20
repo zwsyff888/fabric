@@ -292,7 +292,7 @@ func (lccc *LifeCycleSysCC) isValidChaincodeName(chaincodename string) bool {
 //this implements "install" Invoke transaction
 func (lccc *LifeCycleSysCC) executeInstall(stub shim.ChaincodeStubInterface, depSpec []byte) error {
 	cds, err := lccc.getChaincodeDeploymentSpec(depSpec)
-
+	logger.Infof("lccc.getChaincodeDeploymentSpec %v", len(depSpec))
 	if err != nil {
 		return err
 	}

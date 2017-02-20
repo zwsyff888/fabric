@@ -18,10 +18,14 @@ package car
 
 import (
 	"archive/tar"
-	"fmt"
 	"io/ioutil"
 	"strings"
 
+	"bytes"
+	"fmt"
+	"io"
+
+	"github.com/hyperledger/fabric/core/chaincode/platforms/util"
 	cutil "github.com/hyperledger/fabric/core/container/util"
 	pb "github.com/hyperledger/fabric/protos/peer"
 )
@@ -37,6 +41,11 @@ func (carPlatform *Platform) ValidateSpec(spec *pb.ChaincodeSpec) error {
 	return nil
 }
 
+func (carPlatform *Platform) ValidateDeploymentSpec(cds *pb.ChaincodeDeploymentSpec) error {
+	// CAR platform will validate the code package within chaintool
+	return nil
+}
+
 func (carPlatform *Platform) GetDeploymentPayload(spec *pb.ChaincodeSpec) ([]byte, error) {
 
 	return ioutil.ReadFile(spec.ChaincodeId.Path)
@@ -46,13 +55,9 @@ func (carPlatform *Platform) GenerateDockerfile(cds *pb.ChaincodeDeploymentSpec)
 
 	var buf []string
 
-	spec := cds.ChaincodeSpec
-
 	//let the executable's name be chaincode ID's name
-	buf = append(buf, cutil.GetDockerfileFromConfig("chaincode.car.Dockerfile"))
-	buf = append(buf, "COPY codepackage.car /tmp/codepackage.car")
-	// invoking directly for maximum JRE compatiblity
-	buf = append(buf, fmt.Sprintf("RUN java -jar /usr/local/bin/chaintool buildcar /tmp/codepackage.car -o $GOPATH/bin/%s && rm /tmp/codepackage.car", spec.ChaincodeId.Name))
+	buf = append(buf, "FROM "+cutil.GetDockerfileFromConfig("chaincode.car.runtime"))
+	buf = append(buf, "ADD binpackage.tar /usr/local/bin")
 
 	dockerFileContents := strings.Join(buf, "\n")
 
@@ -61,5 +66,26 @@ func (carPlatform *Platform) GenerateDockerfile(cds *pb.ChaincodeDeploymentSpec)
 
 func (carPlatform *Platform) GenerateDockerBuild(cds *pb.ChaincodeDeploymentSpec, tw *tar.Writer) error {
 
-	return cutil.WriteBytesToPackage("codepackage.car", cds.CodePackage, tw)
+	// Bundle the .car file into a tar stream so it may be transferred to the builder container
+	codepackage, output := io.Pipe()
+	go func() {
+		tw := tar.NewWriter(output)
+
+		err := cutil.WriteBytesToPackage("codepackage.car", cds.CodePackage, tw)
+
+		tw.Close()
+		output.CloseWithError(err)
+	}()
+
+	binpackage := bytes.NewBuffer(nil)
+	err := util.DockerBuild(util.DockerBuildOptions{
+		Cmd:          "java -jar /usr/local/bin/chaintool buildcar /chaincode/input/codepackage.car -o /chaincode/output/chaincode",
+		InputStream:  codepackage,
+		OutputStream: binpackage,
+	})
+	if err != nil {
+		return fmt.Errorf("Error building CAR: %s", err)
+	}
+
+	return cutil.WriteBytesToPackage("binpackage.tar", binpackage.Bytes(), tw)
 }

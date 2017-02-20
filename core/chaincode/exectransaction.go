@@ -44,6 +44,7 @@ func Execute(ctxt context.Context, cccid *ccprovider.CCContext, spec interface{}
 		}
 		cctyp = pb.ChaincodeMessage_TRANSACTION
 	}
+	chaincodeLogger.Infof("Execute %v", cds)
 
 	cID, cMsg, err := theChaincodeSupport.Launch(ctxt, cccid, spec)
 	if err != nil {
@@ -58,7 +59,7 @@ func Execute(ctxt context.Context, cccid *ccprovider.CCContext, spec interface{}
 	}
 
 	// TODO: Need to comment next line and uncomment call to getTimeout, when transaction blocks are being created
-	timeout := time.Duration(30000) * time.Millisecond
+	timeout := time.Duration(300000) * time.Millisecond
 
 	if err != nil {
 		return nil, nil, fmt.Errorf("Failed to retrieve chaincode spec(%s)", err)
@@ -71,6 +72,7 @@ func Execute(ctxt context.Context, cccid *ccprovider.CCContext, spec interface{}
 	}
 
 	resp, err := theChaincodeSupport.Execute(ctxt, cccid, ccMsg, timeout)
+	chaincodeLogger.Info("theChaincodeSupport.Execute %v %v %v %v", ctxt, cccid, ccMsg, timeout)
 	if err != nil {
 		// Rollback transaction
 		return nil, nil, fmt.Errorf("Failed to execute transaction (%s)", err)
