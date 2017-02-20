@@ -69,7 +69,7 @@ JAVASHIM_DEPS =  $(shell git ls-files core/chaincode/shim/java)
 PROTOS = $(shell git ls-files *.proto | grep -v vendor)
 MSP_SAMPLECONFIG = $(shell git ls-files msp/sampleconfig/*.pem)
 PROJECT_FILES = $(shell git ls-files)
-IMAGES = peer orderer ccenv javaenv #buildenv testenv zookeeper kafka couchdb
+IMAGES = peer orderer ccenv javaenv buildenv #testenv zookeeper kafka couchdb
 
 pkgmap.configtxgen    := $(PKGNAME)/common/configtx/tool/configtxgen
 pkgmap.peer           := $(PKGNAME)/peer
