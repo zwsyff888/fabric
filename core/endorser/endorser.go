@@ -337,12 +337,8 @@ func (e *Endorser) ProcessProposal(ctx context.Context, signedProp *pb.SignedPro
 	//       to validate the supplied action before endorsing it
 
 	//1 -- simulate
-<<<<<<< HEAD
-	cd, res, simulationResult, ccevent, err := e.simulateProposal(ctx, chainID, txid, prop, hdrExt.ChaincodeId, txsim)
-	endorserLogger.Infof("simulateProposal %v %v", res, err)
-=======
 	cd, res, simulationResult, ccevent, err := e.simulateProposal(ctx, chainID, txid, signedProp, prop, hdrExt.ChaincodeId, txsim)
->>>>>>> 2419383d2d06d63f64420fbf38cac7a1d94bbd86
+	endorserLogger.Infof("simulateProposal %v %v", res, err)
 	if err != nil {
 		return &pb.ProposalResponse{Response: &pb.Response{Status: 500, Message: err.Error()}}, err
 	}
