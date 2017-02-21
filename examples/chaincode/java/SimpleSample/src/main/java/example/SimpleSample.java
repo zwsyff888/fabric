@@ -58,7 +58,7 @@ public class SimpleSample extends ChaincodeBase {
 		return null;
 	}
 
-	private String  transfer(ChaincodeStub stub, String[] args) {
+	private Response  transfer(ChaincodeStub stub, String[] args) {
 		System.out.println("in transfer");
 		if(args.length!=3){
 			System.out.println("Incorrect number of arguments:"+args.length);
@@ -77,13 +77,17 @@ public class SimpleSample extends ChaincodeBase {
 			try{
 				valFrom = Integer.parseInt(fromAm);
 			}catch(NumberFormatException e ){
-				System.out.println("{\"Error\":\"Expecting integer value for asset holding of "+fromName+" \"}"+e);	String err = "{\"Error\":\"Expecting integer value for asset holding of "+fromName+" \"}";
+				System.out.println("{\"Error\":\"Expecting integer value for asset holding of "+fromName+" \"}"+e);
+				String err = "{\"Error\":\"Expecting integer value for asset holding of "+fromName+" \"}";
 				log.error(err);
 				return ChaincodeResponse.Error("Expecting integer value for asset holding of "+fromName);	
 				//return "{\"Error\":\"Expecting integer value for asset holding of "+fromName+" \"}";		
 			}		
 		}else{
-			return "{\"Error\":\"Failed to get state for " +fromName + "\"}";
+			String err = "{\"Error\":\"Failed to get state for " +fromName + "\"}";
+			log.error(err);
+			return ChaincodeResponse.Error("Failed to get state for " +fromName);	
+			//return "{\"Error\":\"Failed to get state for " +fromName + "\"}";
 		}
 
 		int valTo=0;
@@ -114,11 +118,13 @@ public class SimpleSample extends ChaincodeBase {
 			return ChaincodeResponse.Error("Expecting integer value for amount");
 			//return "{\"Error\":\"Expecting integer value for amount \"}";
 		}		
-		if(valA>valFrom)
+		if(valA>valFrom){
 			String err = "{\"Error\":\"Insufficient asset holding value for requested transfer amount \"}";
 			log.error(err);
 			return ChaincodeResponse.Error("Insufficient asset holding value for requested transfer amount");
 			//return "{\"Error\":\"Insufficient asset holding value for requested transfer amount \"}";
+		}
+			
 		valFrom = valFrom-valA;
 		valTo = valTo+valA;
 		System.out.println("Transfer "+fromName+">"+toName+" am='"+am+"' new values='"+valFrom+"','"+ valTo+"'");
@@ -131,7 +137,7 @@ public class SimpleSample extends ChaincodeBase {
 		
 	}
 
-	public String init(ChaincodeStub stub, String function, String[] args) {
+	public Response init(ChaincodeStub stub, String function, String[] args) {
 		if(args.length!=4){
 			String err = "{\"Error\":\"Incorrect number of arguments. Expecting 4\"}";
 			log.error(err);
@@ -154,7 +160,7 @@ public class SimpleSample extends ChaincodeBase {
 
 	
 	@Override
-	public String query(ChaincodeStub stub, String function, String[] args) {
+	public Response query(ChaincodeStub stub, String function, String[] args) {
 		if(args.length!=1){
 			String err = "{\"Error\":\"Incorrect number of arguments. Expecting name of the person to query\"}";
 			log.error(err);

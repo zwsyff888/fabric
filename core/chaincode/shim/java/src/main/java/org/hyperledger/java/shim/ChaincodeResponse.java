@@ -30,6 +30,7 @@ import org.hyperledger.java.helper.Channel;
 import org.hyperledger.protos.Chaincode.*;
 import org.hyperledger.protos.Chaincodeshim.*;
 import org.hyperledger.protos.Chaincodeshim.ChaincodeMessage.Builder;
+import org.hyperledger.protos.ProposalResponseOuterClass.Response;
 
 import java.util.HashMap;
 import java.util.List;
@@ -37,15 +38,15 @@ import java.util.Map;
 
 import static org.hyperledger.java.fsm.CallbackType.*;
 import static org.hyperledger.protos.Chaincodeshim.ChaincodeMessage.Type.*;
-import static org.hyperledger.protos.Proposal_response.Response;
+
 
 public class ChaincodeResponse {
 
-	private static Log logger = LogFactory.getLog(Response.class);
+	private static Log logger = LogFactory.getLog(ChaincodeResponse.class);
 	
-    private static int OK = "200"; 
+    private static int OK = 200; 
 
-    private static int ERROR = "500"; 
+    private static int ERROR = 500; 
 
 	public ChaincodeResponse() {
 		
@@ -55,7 +56,7 @@ public class ChaincodeResponse {
         return Response
         .newBuilder()
         .setStatus(OK)
-        .setPayload(payload)
+        .setPayload(ByteString.copyFromUtf8(payload))
         .build();
 
     }

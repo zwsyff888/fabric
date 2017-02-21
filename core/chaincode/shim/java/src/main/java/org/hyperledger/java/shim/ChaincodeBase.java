@@ -31,6 +31,7 @@ import org.apache.commons.logging.LogFactory;
 import org.hyperledger.protos.Chaincode.ChaincodeID;
 import org.hyperledger.protos.Chaincodeshim.ChaincodeMessage;
 import org.hyperledger.protos.Chaincodeshim.ChaincodeMessage.Type;
+import org.hyperledger.protos.ProposalResponseOuterClass.Response;
 import org.hyperledger.protos.ChaincodeSupportGrpc;
 import org.hyperledger.protos.ChaincodeSupportGrpc.ChaincodeSupportStub;
 
@@ -41,8 +42,8 @@ public abstract class ChaincodeBase {
 
 	private static Log logger = LogFactory.getLog(ChaincodeBase.class);
 
-	public abstract String run(ChaincodeStub stub, String function, String[] args);
-	public abstract String query(ChaincodeStub stub, String function, String[] args);
+	public abstract Response run(ChaincodeStub stub, String function, String[] args);
+	public abstract Response query(ChaincodeStub stub, String function, String[] args);
 	public abstract String getChaincodeID();
 
 	public static final String DEFAULT_HOST = "127.0.0.1";
