@@ -58,7 +58,7 @@ public class SimpleSample extends ChaincodeBase {
 		return null;
 	}
 
-	private Response  transfer(ChaincodeStub stub, String[] args) {
+	private String transfer(ChaincodeStub stub, String[] args) {
 		System.out.println("in transfer");
 		if(args.length!=3){
 			System.out.println("Incorrect number of arguments:"+args.length);
@@ -137,7 +137,7 @@ public class SimpleSample extends ChaincodeBase {
 		
 	}
 
-	public Response init(ChaincodeStub stub, String function, String[] args) {
+	public String init(ChaincodeStub stub, String function, String[] args) {
 		if(args.length!=4){
 			String err = "{\"Error\":\"Incorrect number of arguments. Expecting 4\"}";
 			log.error(err);
@@ -160,7 +160,7 @@ public class SimpleSample extends ChaincodeBase {
 
 	
 	@Override
-	public Response query(ChaincodeStub stub, String function, String[] args) {
+	public String query(ChaincodeStub stub, String function, String[] args) {
 		if(args.length!=1){
 			String err = "{\"Error\":\"Incorrect number of arguments. Expecting name of the person to query\"}";
 			log.error(err);

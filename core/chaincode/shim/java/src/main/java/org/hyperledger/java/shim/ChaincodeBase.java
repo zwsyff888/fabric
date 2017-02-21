@@ -42,8 +42,8 @@ public abstract class ChaincodeBase {
 
 	private static Log logger = LogFactory.getLog(ChaincodeBase.class);
 
-	public abstract Response run(ChaincodeStub stub, String function, String[] args);
-	public abstract Response query(ChaincodeStub stub, String function, String[] args);
+	public abstract String run(ChaincodeStub stub, String function, String[] args);
+	public abstract String query(ChaincodeStub stub, String function, String[] args);
 	public abstract String getChaincodeID();
 
 	public static final String DEFAULT_HOST = "127.0.0.1";

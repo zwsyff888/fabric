@@ -52,21 +52,25 @@ public class ChaincodeResponse {
 		
 	}
     
-    public static Response Success(String payload){
+    public static String Success(String payload){
         return Response
         .newBuilder()
         .setStatus(OK)
         .setPayload(ByteString.copyFromUtf8(payload))
-        .build();
+        .build()
+        .toByteString()
+        .toStringUtf8(); 
 
     }
 
-    public static Response Error(String msg){
+    public static String Error(String msg){
         return Response
         .newBuilder()
         .setStatus(ERROR)
         .setMessage(msg)
-        .build(); 
+        .build()
+        .toByteString()
+        .toStringUtf8(); 
     }
 	
 }
