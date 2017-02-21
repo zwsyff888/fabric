@@ -797,7 +797,7 @@ func (handler *Handler) handleInvokeChaincode(chaincodeName string, args [][]byt
 		}
 		if respMsg.Type == pb.ChaincodeMessage_COMPLETED {
 			// Success response
-			chaincodeLogger.Debugf("[%s]Received %s. Successfully invoed chaincode", shorttxid(responseMsg.Txid), pb.ChaincodeMessage_RESPONSE)
+			chaincodeLogger.Debugf("[%s]Received %s. Successfully invocked chaincode", shorttxid(responseMsg.Txid), pb.ChaincodeMessage_RESPONSE)
 			res := &pb.Response{}
 			if unmarshalErr := proto.Unmarshal(respMsg.Payload, res); unmarshalErr != nil {
 				chaincodeLogger.Errorf("[%s]Error unmarshaling payload of response: %s", shorttxid(responseMsg.Txid), unmarshalErr)

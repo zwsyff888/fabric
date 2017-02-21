@@ -18,6 +18,7 @@ package example;
 
 import org.hyperledger.java.shim.ChaincodeBase;
 import org.hyperledger.java.shim.ChaincodeStub;
+import org.hyperledger.java.shim.ChaincodeResponse;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
@@ -61,7 +62,10 @@ public class SimpleSample extends ChaincodeBase {
 		System.out.println("in transfer");
 		if(args.length!=3){
 			System.out.println("Incorrect number of arguments:"+args.length);
-			return "{\"Error\":\"Incorrect number of arguments. Expecting 3: from, to, amount\"}";
+			String err = "{\"Error\":\"Incorrect number of arguments. Expecting 3: from, to, amount\"}";
+			log.error(err);
+			return ChaincodeResponse.Error("Incorrect number of arguments. Expecting 3: from, to, amount");
+			//return "{\"Error\":\"Incorrect number of arguments. Expecting 3: from, to, amount\"}";
 		}
 		String fromName =args[0];
 		String fromAm=stub.getState(fromName);
@@ -73,8 +77,10 @@ public class SimpleSample extends ChaincodeBase {
 			try{
 				valFrom = Integer.parseInt(fromAm);
 			}catch(NumberFormatException e ){
-				System.out.println("{\"Error\":\"Expecting integer value for asset holding of "+fromName+" \"}"+e);		
-				return "{\"Error\":\"Expecting integer value for asset holding of "+fromName+" \"}";		
+				System.out.println("{\"Error\":\"Expecting integer value for asset holding of "+fromName+" \"}"+e);	String err = "{\"Error\":\"Expecting integer value for asset holding of "+fromName+" \"}";
+				log.error(err);
+				return ChaincodeResponse.Error("Expecting integer value for asset holding of "+fromName);	
+				//return "{\"Error\":\"Expecting integer value for asset holding of "+fromName+" \"}";		
 			}		
 		}else{
 			return "{\"Error\":\"Failed to get state for " +fromName + "\"}";
@@ -86,10 +92,16 @@ public class SimpleSample extends ChaincodeBase {
 				valTo = Integer.parseInt(toAm);
 			}catch(NumberFormatException e ){
 				e.printStackTrace();
-				return "{\"Error\":\"Expecting integer value for asset holding of "+toName+" \"}";		
+				String err = "{\"Error\":\"Expecting integer value for asset holding of "+toName+" \"}";
+				log.error(err);
+				return ChaincodeResponse.Error("Expecting integer value for asset holding of "+toName);
+				//return "{\"Error\":\"Expecting integer value for asset holding of "+toName+" \"}";		
 			}		
 		}else{
-			return "{\"Error\":\"Failed to get state for " +toName + "\"}";
+			String err = "{\"Error\":\"Failed to get state for " +toName + "\"}";
+			log.error(err);
+			return ChaincodeResponse.Error("Failed to get state for " +toName);
+			//return "{\"Error\":\"Failed to get state for " +toName + "\"}";
 		}
 		
 		int valA =0;
@@ -97,10 +109,16 @@ public class SimpleSample extends ChaincodeBase {
 			valA = Integer.parseInt(am);
 		}catch(NumberFormatException e ){
 			e.printStackTrace();
-			return "{\"Error\":\"Expecting integer value for amount \"}";
+			String err = "{\"Error\":\"Expecting integer value for amount \"}";
+			log.error(err);
+			return ChaincodeResponse.Error("Expecting integer value for amount");
+			//return "{\"Error\":\"Expecting integer value for amount \"}";
 		}		
 		if(valA>valFrom)
-			return "{\"Error\":\"Insufficient asset holding value for requested transfer amount \"}";
+			String err = "{\"Error\":\"Insufficient asset holding value for requested transfer amount \"}";
+			log.error(err);
+			return ChaincodeResponse.Error("Insufficient asset holding value for requested transfer amount");
+			//return "{\"Error\":\"Insufficient asset holding value for requested transfer amount \"}";
 		valFrom = valFrom-valA;
 		valTo = valTo+valA;
 		System.out.println("Transfer "+fromName+">"+toName+" am='"+am+"' new values='"+valFrom+"','"+ valTo+"'");
@@ -115,7 +133,10 @@ public class SimpleSample extends ChaincodeBase {
 
 	public String init(ChaincodeStub stub, String function, String[] args) {
 		if(args.length!=4){
-			return "{\"Error\":\"Incorrect number of arguments. Expecting 4\"}";
+			String err = "{\"Error\":\"Incorrect number of arguments. Expecting 4\"}";
+			log.error(err);
+			return ChaincodeResponse.Error("Incorrect number of arguments. Expecting 4");
+			//return "{\"Error\":\"Incorrect number of arguments. Expecting 4\"}";
 		}
 		try{
 			int valA = Integer.parseInt(args[1]);
@@ -123,7 +144,10 @@ public class SimpleSample extends ChaincodeBase {
 			stub.putState(args[0], args[1]);
 			stub.putState(args[2], args[3]);		
 		}catch(NumberFormatException e ){
-			return "{\"Error\":\"Expecting integer value for asset holding\"}";
+			String err = "{\"Error\":\"Expecting integer value for asset holding\"}";
+			log.error(err);
+			return ChaincodeResponse.Error("Expecting integer value for asset holding");
+			//return "{\"Error\":\"Expecting integer value for asset holding\"}";
 		}		
 		return null;
 	}
@@ -132,17 +156,29 @@ public class SimpleSample extends ChaincodeBase {
 	@Override
 	public String query(ChaincodeStub stub, String function, String[] args) {
 		if(args.length!=1){
-			return "{\"Error\":\"Incorrect number of arguments. Expecting name of the person to query\"}";
+			String err = "{\"Error\":\"Incorrect number of arguments. Expecting name of the person to query\"}";
+			log.error(err);
+			return ChaincodeResponse.Error("Incorrect number of arguments. Expecting name of the person to query");
+			//return "{\"Error\":\"Incorrect number of arguments. Expecting name of the person to query\"}";
 		}
 		String am =stub.getState(args[0]);
 		if (am!=null&&!am.isEmpty()){
 			try{
 				int valA = Integer.parseInt(am);
-				return  "{\"Name\":\"" + args[0] + "\",\"Amount\":\"" + am + "\"}";
+				String res = "{\"Name\":\"" + args[0] + "\",\"Amount\":\"" + am + "\"}";
+				log.info(res);
+				return ChaincodeResponse.Success(am);
+				//return  "{\"Name\":\"" + args[0] + "\",\"Amount\":\"" + am + "\"}";
 			}catch(NumberFormatException e ){
-				return "{\"Error\":\"Expecting integer value for asset holding\"}";		
+				String err = "{\"Error\":\"Expecting integer value for asset holding\"}";
+				log.error(err);
+				return ChaincodeResponse.Error("Expecting integer value for asset holding");
+				//return "{\"Error\":\"Expecting integer value for asset holding\"}";		
 			}		}else{
-			return "{\"Error\":\"Failed to get state for " + args[0] + "\"}";
+				String err = "{\"Error\":\"Failed to get state for " + args[0] + "\"}";
+				log.error(err);
+				return ChaincodeResponse.Error("Failed to get state for " + args[0]);
+				//return "{\"Error\":\"Failed to get state for " + args[0] + "\"}";
 		}
 		
 

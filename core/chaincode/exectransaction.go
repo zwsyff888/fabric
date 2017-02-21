@@ -88,6 +88,7 @@ func Execute(ctxt context.Context, cccid *ccprovider.CCContext, spec interface{}
 
 	if resp.Type == pb.ChaincodeMessage_COMPLETED {
 		res := &pb.Response{}
+		chaincodeLogger.Infof("transaction resp %v", resp)
 		unmarshalErr := proto.Unmarshal(resp.Payload, res)
 		if unmarshalErr != nil {
 			return nil, nil, fmt.Errorf("Failed to unmarshal response for (%s): %s", cccid.TxID, unmarshalErr)
