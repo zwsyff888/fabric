@@ -466,7 +466,7 @@ public class Handler {
 
 	public void handlePutState(String key, ByteString value, String uuid) {
 		// Check if this is a transaction
-		logger.info("["+ shortID(uuid)+"]Inside putstate (\""+key+"\":\""+value+"\"), isTransaction = "+isTransaction(uuid));
+		logger.info("["+ shortID(uuid)+"]Inside putstate (\""+key+"\":\""+value.toStringUtf8()+"\"), isTransaction = "+isTransaction(uuid));
 
 		if (!isTransaction(uuid)) {
 			throw new IllegalStateException("Cannot put state in query context");

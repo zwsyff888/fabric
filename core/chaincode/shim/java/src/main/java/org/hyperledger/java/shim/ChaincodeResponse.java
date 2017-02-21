@@ -52,25 +52,31 @@ public class ChaincodeResponse {
 		
 	}
     
-    public static String Success(String payload){
-        return Response
+    public static ByteString Success(String payload){
+        logger.info("payload:"+payload);
+        Response res = Response
         .newBuilder()
         .setStatus(OK)
         .setPayload(ByteString.copyFromUtf8(payload))
-        .build()
-        .toByteString()
-        .toStringUtf8(); 
+        .build();
+        //.toByteString()
+        //.toStringUtf8(); 
+        //logger.info("Success:"+res);
+        return res.toByteString();
 
     }
 
-    public static String Error(String msg){
-        return Response
+    public static ByteString Error(String msg){
+        logger.info("msg:"+msg);
+        Response res = Response
         .newBuilder()
         .setStatus(ERROR)
         .setMessage(msg)
-        .build()
-        .toByteString()
-        .toStringUtf8(); 
+        .build();
+        //.toByteString()
+        //.toStringUtf8();
+        //logger.info("Error:"+res);
+        return res.toByteString();
     }
 	
 }

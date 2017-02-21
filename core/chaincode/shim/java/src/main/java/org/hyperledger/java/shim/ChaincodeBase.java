@@ -42,8 +42,8 @@ public abstract class ChaincodeBase {
 
 	private static Log logger = LogFactory.getLog(ChaincodeBase.class);
 
-	public abstract String run(ChaincodeStub stub, String function, String[] args);
-	public abstract String query(ChaincodeStub stub, String function, String[] args);
+	public abstract ByteString run(ChaincodeStub stub, String function, String[] args);
+	public abstract ByteString query(ChaincodeStub stub, String function, String[] args);
 	public abstract String getChaincodeID();
 
 	public static final String DEFAULT_HOST = "127.0.0.1";
@@ -224,17 +224,22 @@ public abstract class ChaincodeBase {
 	protected ByteString runHelper(ChaincodeStub stub, String function, String[] args) {
 		ByteString ret = runRaw(stub, function, args);
 		if (ret == null) {
-			String tmp = run(stub, function, args);
-			ret = ByteString.copyFromUtf8(tmp == null ? "" : tmp);
+			ByteString tmp = run(stub, function, args);
+			ret = tmp;
+			//ret = ByteString.copyFromUtf8(tmp == null ? "" : tmp);
 		}
+		logger.info(ret);
 		return ret;
 	}
 
 	protected ByteString queryHelper(ChaincodeStub stub, String function, String[] args) {
 		ByteString ret = queryRaw(stub, function, args);
 		if (ret == null) {
-			ret = ByteString.copyFromUtf8(query(stub, function, args));
+			ByteString tmp = query(stub, function, args);
+			ret = tmp;
+			//ret = ByteString.copyFromUtf8(query(stub, function, args));
 		}
+		logger.info(ret);
 		return ret;
 	}
 }

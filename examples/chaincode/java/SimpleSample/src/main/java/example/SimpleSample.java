@@ -21,6 +21,7 @@ import org.hyperledger.java.shim.ChaincodeStub;
 import org.hyperledger.java.shim.ChaincodeResponse;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import com.google.protobuf.ByteString;
 
 /**
  * <h1>Classic "transfer" sample chaincode</h1>
@@ -32,7 +33,7 @@ public class SimpleSample extends ChaincodeBase {
 	 private static Log log = LogFactory.getLog(SimpleSample.class);
 
 	@Override
-	public String run(ChaincodeStub stub, String function, String[] args) {
+	public ByteString run(ChaincodeStub stub, String function, String[] args) {
 		log.info("In run, function:"+function);
 		
 		switch (function) {
@@ -40,8 +41,8 @@ public class SimpleSample extends ChaincodeBase {
 			init(stub, function, args);
 			break;
 		case "transfer":
-			String re = transfer(stub, args);	
-			System.out.println(re);
+			Response re = transfer(stub, args);	
+			//System.out.println(re);
 			return re;					
 		case "put":
 			for (int i = 0; i < args.length; i += 2)
@@ -51,14 +52,17 @@ public class SimpleSample extends ChaincodeBase {
 			for (String arg : args)
 				stub.delState(arg);
 			break;
+		case "query":
+		    return query(stub, function, args);
+			//break;
 		default: 
 			return transfer(stub, args);
 		}
 	 
-		return null;
+		return ChaincodeResponse.Success("");
 	}
 
-	private String transfer(ChaincodeStub stub, String[] args) {
+	private ByteString transfer(ChaincodeStub stub, String[] args) {
 		System.out.println("in transfer");
 		if(args.length!=3){
 			System.out.println("Incorrect number of arguments:"+args.length);
@@ -133,11 +137,11 @@ public class SimpleSample extends ChaincodeBase {
 
 		System.out.println("Transfer complete");
 
-		return null;
+		return ChaincodeResponse.Success("");
 		
 	}
 
-	public String init(ChaincodeStub stub, String function, String[] args) {
+	public ByteString init(ChaincodeStub stub, String function, String[] args) {
 		if(args.length!=4){
 			String err = "{\"Error\":\"Incorrect number of arguments. Expecting 4\"}";
 			log.error(err);
@@ -155,12 +159,12 @@ public class SimpleSample extends ChaincodeBase {
 			return ChaincodeResponse.Error("Expecting integer value for asset holding");
 			//return "{\"Error\":\"Expecting integer value for asset holding\"}";
 		}		
-		return null;
+		return ChaincodeResponse.Success("");
 	}
 
 	
 	@Override
-	public String query(ChaincodeStub stub, String function, String[] args) {
+	public ByteString query(ChaincodeStub stub, String function, String[] args) {
 		if(args.length!=1){
 			String err = "{\"Error\":\"Incorrect number of arguments. Expecting name of the person to query\"}";
 			log.error(err);
