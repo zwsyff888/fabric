@@ -41,7 +41,7 @@ public class SimpleSample extends ChaincodeBase {
 			init(stub, function, args);
 			break;
 		case "transfer":
-			Response re = transfer(stub, args);	
+			ByteString re = transfer(stub, args);	
 			//System.out.println(re);
 			return re;					
 		case "put":
