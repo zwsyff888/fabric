@@ -58,10 +58,11 @@ message TransData{
     string ChainID = 2;
     google.protobuf.Timestamp Time = 3;
     string ChainCodeID = 4;
-    string Payload = 5;
-    string Type = 6;
-    string Nonce = 7;
-    string Signature = 8;
+    string Input = 5;
+    string Result = 6;
+    string Type = 7;
+    string Nonce = 8;
+    string Signature = 9;
 }
 
 message MblockMetadata {
