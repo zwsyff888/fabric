@@ -18,7 +18,6 @@ package configtx
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/hyperledger/fabric/common/policies"
 	cb "github.com/hyperledger/fabric/protos/common"
@@ -123,10 +122,6 @@ func (cm *configManager) authorizeUpdate(configUpdateEnv *cb.ConfigUpdateEnvelop
 }
 
 func (cm *configManager) policyForItem(item comparable) (policies.Policy, bool) {
-	if strings.HasPrefix(item.modPolicy(), PathSeparator) {
-		return cm.PolicyManager().GetPolicy(item.modPolicy()[1:])
-	}
-
 	// path is always at least of length 1
 	manager, ok := cm.PolicyManager().Manager(item.path[1:])
 	if !ok {
@@ -154,11 +149,16 @@ func envelopeToConfigUpdate(configtx *cb.Envelope) (*cb.ConfigUpdateEnvelope, er
 		return nil, err
 	}
 
-	if payload.Header == nil || payload.Header.ChannelHeader == nil {
-		return nil, fmt.Errorf("Envelope must have ChannelHeader")
+	if payload.Header == nil /* || payload.Header.ChannelHeader == nil */ {
+		return nil, fmt.Errorf("Envelope must have a Header")
 	}
 
-	if payload.Header == nil || payload.Header.ChannelHeader.Type != int32(cb.HeaderType_CONFIG_UPDATE) {
+	chdr, err := utils.UnmarshalChannelHeader(payload.Header.ChannelHeader)
+	if err != nil {
+		return nil, fmt.Errorf("Invalid ChannelHeader")
+	}
+
+	if chdr.Type != int32(cb.HeaderType_CONFIG_UPDATE) {
 		return nil, fmt.Errorf("Not a tx of type CONFIG_UPDATE")
 	}
 
