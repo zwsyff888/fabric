@@ -11,6 +11,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 	"net"
+	"time"
 )
 
 type server struct{}
@@ -29,6 +30,7 @@ func (s *server) ProcessMessage(ctx context.Context, inputMessage *pb.ChannelMes
 	//message
 	MapMutex.Lock()
 	defer MapMutex.Unlock()
+	dataChange := false
 	for i := 0; i < len(inputMessage.ChannelInput); i++ {
 		peerMessage := NewPeerMessage()
 		peerMessage.InitMessage(inputMessage.ChannelInput[i])
@@ -39,16 +41,35 @@ func (s *server) ProcessMessage(ctx context.Context, inputMessage *pb.ChannelMes
 
 		if _, ok := AllChannelPeerStatusMap[peerKey]; ok {
 			//此处可能存在线程不安全
-			AllChannelPeerStatusMap[peerKey][tmpKey] = peerMessage
+			//判断peerMessage中Mblock的最后一块的currentHash是否有变动即可
+			if _, ok := AllChannelPeerStatusMap[peerKey][tmpKey]; ok {
+				if IsChange(AllChannelPeerStatusMap[peerKey][tmpKey], peerMessage) {
+					AllChannelPeerStatusMap[peerKey][tmpKey] = peerMessage
+					dataChange = true
+				} else {
+					AllChannelPeerStatusMap[peerKey][tmpKey].Time = time.Now().Unix()
+				}
+			} else {
+				AllChannelPeerStatusMap[peerKey][tmpKey] = peerMessage
+				dataChange = true
+			}
+
 		} else {
 			AllChannelPeerStatusMap[peerKey] = make(map[string]*PeerMessage)
 			AllChannelPeerStatusMap[peerKey][tmpKey] = peerMessage
+			dataChange = true
+			//peer接口
 		}
 
 	}
 
 	fmt.Println("@@@@chenqiao: ", AllChannelPeerStatusMap)
-
+	if dataChange {
+		//触发数据刷新
+		fmt.Println("it's time to send DATA!!")
+		SocketsProperty.Update()
+		fmt.Println("TTTTTT", SocketsProperty)
+	}
 	return &pb.MessageOutput{Output: "hehe " + "I GOT IT"}, nil
 }
 

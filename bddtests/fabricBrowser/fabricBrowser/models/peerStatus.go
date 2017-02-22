@@ -1,7 +1,7 @@
 package models
 
 import (
-	// "fmt"
+	"fmt"
 	"github.com/astaxie/beego"
 	// "strconv"
 	// "encoding/json"
@@ -10,11 +10,24 @@ import (
 )
 
 var MapMutex sync.Mutex
-var PeerStatusMap map[string]*PeerMessage
 var AllChannelPeerStatusMap map[string](map[string]*PeerMessage)
 var FabricTimeCycle, _ = beego.AppConfig.Int64("fabricTimeCycle")
 var CheckTimeCycle, _ = beego.AppConfig.Int64("checkTimeCycle")
 var BufferTime, _ = beego.AppConfig.Int64("bufferTime")
+
+func IsChange(before *PeerMessage, after *PeerMessage) bool {
+	if before.Status != after.Status || before.Name != after.Name || before.PeerIp != after.PeerIp || before.Height != after.Height {
+		return true
+	} else { //找到最高块的hash
+		highest := int(before.Height - 1)
+		if before.Mblocks[highest].Header.CurrentHash == after.Mblocks[highest].Header.CurrentHash {
+			return false
+		} else {
+			return true
+		}
+
+	}
+}
 
 func BaseCheck(args ...interface{}) bool {
 	if len(args) == 0 {
@@ -74,6 +87,10 @@ func GetMaxPeer(chainid string) (string, uint64) {
 		if PeerStatusMap[key].Height > maxHeight {
 			maxHeight = PeerStatusMap[key].Height
 			maxPeerId = key
+		} else if PeerStatusMap[key].Height == maxHeight {
+			if maxPeerId > key {
+				maxPeerId = key
+			}
 		}
 	}
 	return maxPeerId, maxHeight
@@ -89,13 +106,15 @@ func CheckEnable() {
 				// fmt.Println("@@@@chenqiao Check Time: ", now-value.Time)
 				if now-value.Time > (FabricTimeCycle + BufferTime) {
 					value.Status = 0
+
+					//peer状态需要更新
+					fmt.Println("it's time to send DATA!!")
+					SocketsProperty.Update()
+					fmt.Println("TTTTTT", SocketsProperty)
 				}
 			}
-			// fmt.Println("@@@@chenqiao Check : ", PeerStatusMap["172.18.0.3"])
 
 		}
-		// fmt.Println("@@@chenqiao Check Peer: ", PeerStatusMap)
-		// fmt.Println("@@@chenqiao Time: ", CheckTimeCycle)
 		MapMutex.Unlock()
 		time.Sleep(time.Duration(CheckTimeCycle) * 1e9)
 	}
