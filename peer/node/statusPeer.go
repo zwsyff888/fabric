@@ -16,7 +16,6 @@ import (
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
-
 	"log"
 	"net"
 	"os"
@@ -27,6 +26,10 @@ import (
 
 type server struct{}
 
+type argsData struct {
+	Args []string `json:"args"`
+}
+
 func getChainCodeID(inputs string) string {
 	s := strings.Split(inputs, "\n")
 	cn := strings.Split(s[1], ":")
@@ -35,6 +38,30 @@ func getChainCodeID(inputs string) string {
 
 	return chainCodeID
 
+}
+
+func getInputDetail(input [][]byte) string {
+	// func chainname path funcArgs
+	var ans string
+
+	//deploy
+
+	if string(input[0]) == "deploy" {
+		ans = ans + string(input[0]) + " " + string(input[1]) + " "
+
+		s := strings.Split(string(input[2]), "\n")
+		for i := 0; i < len(s); i++ {
+			ans = ans + s[i] + " "
+		}
+	} else {
+		for i := 0; i < len(input); i++ {
+			ans = ans + string(input[i]) + " "
+		}
+	}
+
+	//invoke
+
+	return ans
 }
 
 func getBlockDataByIndex(j int, blocks []*common.Block) *pb.Mblock {
@@ -105,12 +132,23 @@ func getBlockDataByIndex(j int, blocks []*common.Block) *pb.Mblock {
 			continue
 		}
 
-		chainpayload := base64.StdEncoding.EncodeToString(cap.ChaincodeProposalPayload)
+		cpp := &pb.ChaincodeProposalPayload{}
+		cpperr := proto.Unmarshal(cap.ChaincodeProposalPayload, cpp)
+		if cpperr != nil {
+			fmt.Println("CPP ERROR!!!!!")
+			continue
+		}
 
 		prpayload := &pb.ProposalResponsePayload{}
 		prperr := proto.Unmarshal(cap.Action.ProposalResponsePayload, prpayload)
 		if prperr != nil {
-			// fmt.Println("PRP ERROR!!! ")
+			fmt.Println("PRP ERROR!!! ")
+			transData := &pb.TransData{
+				Txid:    txid,
+				ChainID: tchainID,
+				Time:    time,
+			}
+			tmpblockData = append(tmpblockData, transData)
 			continue
 		}
 
@@ -121,12 +159,53 @@ func getBlockDataByIndex(j int, blocks []*common.Block) *pb.Mblock {
 			continue
 		}
 
+		cis := &pb.ChaincodeInvocationSpec{}
+		ciserr := proto.Unmarshal(cpp.Input, cis)
+		if ciserr != nil {
+			fmt.Println("CIS ERROR!!!!!")
+			continue
+		}
+
+		inputDetail := getInputDetail(cis.ChaincodeSpec.Input.Args)
+
+		// fmt.Println("UUUUUUUUUUUUU", cis.ChaincodeSpec.Input)
+		// a, err := json.Marshal(cis.ChaincodeSpec.Input)
+		// if err != nil {
+		// 	fmt.Println("json err!!! ", err)
+		// }
+
+		// fmt.Println("hehehehelalalala", string(a))
+
+		// var tdata argsData
+		// if err := json.Unmarshal(a, &tdata); err == nil {
+		// 	for i := 0; i < len(tdata.args); i++ {
+		// 		abytes, err64 := base64.StdEncoding.DecodeString(tdata.args[i])
+		// 		if err64 != nil {
+		// 			fmt.Println("base64 err", err)
+		// 		}
+		// 		fmt.Println("HOHOHOHOHOHOHO", string(abytes))
+		// 	}
+
+		// }
+
 		txRWSet := &rwset.TxReadWriteSet{}
 		txRWSet.Unmarshal(ccids.Results)
 
-		// fmt.Println("HEHEHEHEHEHEHEHE!!!HE!!")
+		// fmt.Println("HEHEHEHEHEHEHEHE!!!HE!!", inputDetail)
 
 		chainCodeID := getChainCodeID(txRWSet.String())
+
+		// ccids.Results
+		var result string
+		for _, nsRWSet := range txRWSet.NsRWs {
+			if nsRWSet.NameSpace == chainCodeID {
+				for _, value := range nsRWSet.Writes {
+					// fmt.Println("LLLLL ", value.Key, "QQQQQ", string(value.Value))
+					result = result + value.Key + ":" + string(value.Value) + "  "
+				}
+			}
+
+		}
 
 		che := &pb.ChaincodeHeaderExtension{}
 		cheerr := proto.Unmarshal(hdr.Extension, che)
@@ -149,18 +228,17 @@ func getBlockDataByIndex(j int, blocks []*common.Block) *pb.Mblock {
 			continue
 		}
 
-		// fmt.Println("TTTTTTTTTT", hsr.Nonce)
-		// fmt.Println("PPPPPPPPPP", e.Signature)
-
 		transData := &pb.TransData{
 			Txid:        txid,
 			ChainID:     tchainID,
 			Time:        time,
 			ChainCodeID: chainCodeID,
-			Payload:     chainpayload,
-			Type:        strconv.Itoa(int(hdr.Type)),
-			Nonce:       base64.StdEncoding.EncodeToString(hsr.Nonce),
-			Signature:   base64.StdEncoding.EncodeToString(e.Signature),
+			Result:      result,
+			Input:       inputDetail,
+			// Payload:     chainpayload,
+			Type:      strconv.Itoa(int(hdr.Type)),
+			Nonce:     base64.StdEncoding.EncodeToString(hsr.Nonce),
+			Signature: base64.StdEncoding.EncodeToString(e.Signature),
 		}
 		tmpblockData = append(tmpblockData, transData)
 

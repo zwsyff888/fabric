@@ -17,8 +17,8 @@ func main() {
 	models.AllChannelPeerStatusMap = make(map[string](map[string]*models.PeerMessage))
 	// models.QueryClient()
 	logs.Debug(models.AllChannelPeerStatusMap)
-
 	beego.SetStaticPath("/super", "static/supervise")
+	models.SocketsProperty = models.NewProperty()
 	// beego.AddFuncMap("i18n", i18n.Tr)
 	beego.Run()
 

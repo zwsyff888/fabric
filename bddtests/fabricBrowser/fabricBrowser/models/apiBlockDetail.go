@@ -22,12 +22,15 @@ func GetBlockDetail(peerId string, blockNum uint64, chainid string) *Mblock {
 		//去rpc中拿
 		// fmt.Println("hehe, come rpc!!")
 		//暂时不考虑
-		logs.Debug("hehe, come rpc!!!")
-		// return nil
-		pbBlocks := QueryClient(blockNum)
-		mblock := NewMblock()
-		mblock.initMblock(pbBlocks)
-		return mblock
+		/*
+			logs.Debug("hehe, come rpc!!!")
+			// return nil
+			pbBlocks := QueryClient(blockNum)
+			mblock := NewMblock()
+			mblock.initMblock(pbBlocks)
+			return mblock*/
+		return nil
+
 	}
 
 }
