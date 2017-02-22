@@ -59,18 +59,24 @@ func getBlockDataByIndex(j int, blocks []*common.Block) *pb.Mblock {
 		//尝试解析Data得到txid和chainid
 		e, err := utils.GetEnvelopeFromBlock(blocksData.Data[k])
 		if err != nil {
-			fmt.Println("@@@@chenqiao: err", err)
+			fmt.Println("@@@@chenqiao: Envelope err", err)
 			continue
 		}
 		p, err := utils.UnmarshalPayload(e.Payload)
 		if err != nil {
-			fmt.Println("@@@@chenqiao: err", err)
+			fmt.Println("@@@@chenqiao: Payload err", err)
 			continue
 		}
 
-		txid := p.Header.ChannelHeader.TxId
-		tchainID := p.Header.ChannelHeader.ChannelId
-		time := p.Header.ChannelHeader.Timestamp
+		hdr, err := utils.UnmarshalChannelHeader(p.Header.ChannelHeader)
+		if err != nil {
+			fmt.Println("@@@@chenqiao: ChannelHeader err", err)
+			continue
+		}
+
+		txid := hdr.TxId
+		tchainID := hdr.ChannelId
+		time := hdr.Timestamp
 
 		// fmt.Println("@@@@ chenqiao txid: ", txid)
 		// fmt.Println("@@@@ chenqiao tchainID: ", tchainID)
@@ -104,7 +110,7 @@ func getBlockDataByIndex(j int, blocks []*common.Block) *pb.Mblock {
 		prpayload := &pb.ProposalResponsePayload{}
 		prperr := proto.Unmarshal(cap.Action.ProposalResponsePayload, prpayload)
 		if prperr != nil {
-			fmt.Println("PRP ERROR!!! ")
+			// fmt.Println("PRP ERROR!!! ")
 			continue
 		}
 
@@ -123,7 +129,7 @@ func getBlockDataByIndex(j int, blocks []*common.Block) *pb.Mblock {
 		chainCodeID := getChainCodeID(txRWSet.String())
 
 		che := &pb.ChaincodeHeaderExtension{}
-		cheerr := proto.Unmarshal(p.Header.ChannelHeader.Extension, che)
+		cheerr := proto.Unmarshal(hdr.Extension, che)
 		if cheerr != nil {
 			fmt.Println("CHE ERROR!!! ")
 			continue
@@ -131,13 +137,19 @@ func getBlockDataByIndex(j int, blocks []*common.Block) *pb.Mblock {
 
 		ms := &msp.SerializedIdentity{}
 
-		mserr := proto.Unmarshal(p.Header.SignatureHeader.Creator, ms)
+		hsr, hsrerr := utils.GetSignatureHeader(p.Header.SignatureHeader)
+		if hsrerr != nil {
+			fmt.Println("HSR ERROR!!! ")
+			continue
+		}
+
+		mserr := proto.Unmarshal(hsr.Creator, ms)
 		if mserr != nil {
 			fmt.Println("MS ERROR!!! ")
 			continue
 		}
 
-		// fmt.Println("TTTTTTTTTT", p.Header.SignatureHeader.Nonce)
+		// fmt.Println("TTTTTTTTTT", hsr.Nonce)
 		// fmt.Println("PPPPPPPPPP", e.Signature)
 
 		transData := &pb.TransData{
@@ -146,8 +158,8 @@ func getBlockDataByIndex(j int, blocks []*common.Block) *pb.Mblock {
 			Time:        time,
 			ChainCodeID: chainCodeID,
 			Payload:     chainpayload,
-			Type:        strconv.Itoa(int(p.Header.ChannelHeader.Type)),
-			Nonce:       base64.StdEncoding.EncodeToString(p.Header.SignatureHeader.Nonce),
+			Type:        strconv.Itoa(int(hdr.Type)),
+			Nonce:       base64.StdEncoding.EncodeToString(hsr.Nonce),
 			Signature:   base64.StdEncoding.EncodeToString(e.Signature),
 		}
 		tmpblockData = append(tmpblockData, transData)
