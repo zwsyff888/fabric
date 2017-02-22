@@ -56,7 +56,7 @@ METADATA_VAR += BaseVersion=$(BASEIMAGE_RELEASE)
 
 GO_LDFLAGS = $(patsubst %,-X $(PKGNAME)/common/metadata.%,$(METADATA_VAR))
 
-CHAINTOOL_URL ?= http://192.168.100.119:9000/software/chaintool_v0.10.2
+CHAINTOOL_URL ?= http://121.40.119.186:9000/software/chaintool_v0.10.2
 
 export GO_LDFLAGS
 
